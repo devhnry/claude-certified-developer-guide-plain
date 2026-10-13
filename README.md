@@ -13,6 +13,7 @@ Each chapter keeps every fact, number, `code term` and citation from the origina
 
 - `plain/chapters/` has the rewritten chapters. Start here.
 - `book/chapters/` has the original chapters, untouched, so you can compare.
+- `ERRATA.md` lists places where the original contradicts itself.
 - `STYLE.md` has the rules the rewrite followed.
 - `tools/check_facts.py` flags any number, `code term` or citation in the original that is missing from a rewrite.
 
