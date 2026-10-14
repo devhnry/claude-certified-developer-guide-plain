@@ -1,202 +1,198 @@
 # Chapter 2: Four Parts to Every Call, and Three Places It Breaks
 
-**Summary**: *Every request to Claude carries the same four parts. Every failure worth debugging sits in one of three seams (the gaps) between them. Keep the seams apart and a whole family of exam scenarios answers itself. Which failures deserve another attempt? Which need fixing before the call leaves the building? Which arrive with a perfectly healthy status code? Mix them up and you lose an afternoon adding backoff to a malformed request, or filing a network ticket about an answer the model gave on purpose.*
+**Summary**: *Each request to Claude has the same four parts. Each failure worth debugging happens in one of three gaps between them. Learn the gaps and many exam scenarios answer themselves. You will know which failures deserve a retry, which need repair before sending, and which come back looking healthy. Otherwise you lose an afternoon adding backoff to a broken request, or filing a network ticket about an answer the model gave on purpose.*
 
 ## Four Parts Go Out on Every Call, and the Fourth One Is a Contract
 
-**First, the idea.** Calling Claude is like sending a parcel through the post and waiting for a reply. Every call has the same four parts. We will use that post office picture for the whole chapter.
+Picture mailing a parcel. You write an address, show ID, put something inside, and get a receipt back that you must read. That parcel is the analogy for this chapter: every call to Claude is a parcel through the post.
 
-**The four parts.** Claude is reached over a **REST API** (a web service you talk to with ordinary web requests) at `https://api.anthropic.com`. A message goes to **`POST /v1/messages`**.<sup>[1]</sup> That is the **address** (the street address on the parcel). Then come **three headers**, and none of them is optional. Headers are the labels on the outside of the envelope:
-- a **credential**, which is either an **`x-api-key`** value or an **`Authorization` bearer token** (your ID at the counter)
-- an **`anthropic-version`** value such as `2023-06-01` (which edition of the rules you are using)
-- **`content-type: application/json`** (what language the letter is written in)<sup>[1]</sup>
+Write one call by hand, once, in a file you will delete. A library does this for you later, but a layer you never saw gets blamed wrongly.
 
-Then comes the JSON **body** (the letter inside). Then comes the **response** (the reply that comes back). Developers stop paying attention to the reply, and that is where the interesting failures live.
+Claude sits behind a **REST API** at `https://api.anthropic.com`. To send a message you use `POST /v1/messages`.<sup>[1]</sup> That is the address. Three headers go along, and all are required.<sup>[1]</sup>
 
-I call this the **four-part call**: an **address**, **headers** that prove who you are and pin a version, a **body**, and a **response** you have to interpret instead of just reading.
+- A credential: an `x-api-key` value, or an `Authorization` bearer token.
+- An `anthropic-version` value, such as `2023-06-01`.
+- `content-type: application/json`.
 
-**Why write it out by hand once.** Do it once in a scratch file nobody keeps. Not because it ships that way. Everything a client library does later is one of these four parts. A failure inside a part nobody has looked at gets blamed on the nearest part somebody has.
+Next comes a JSON body, then the response, where most developers stop looking and the strange failures live.
 
-| Part | What it carries | What its failure looks like |
+Call this the **four-part call**: address, headers, body, response. The response needs interpreting, not just reading.
+
+| Part | Carries | Failure looks like |
 |---|---|---|
-| Address (the street address) | Endpoint and HTTP method | A `404`, on a path that looks right |
-| Headers (the labels and ID) | Credential, API version, content type | A `401` or a `403`, identical on every attempt |
-| Body (the letter) | The JSON payload of the request | A `400`, or a `413` past 32 MB |
-| Response (the reply) | Status code, headers, JSON body | Nothing at all, until something downstream falls over |
+| Address | Where it goes and how | A `404`, though the path looks fine |
+| Headers | Who you are, which API version, what format | `401` or `403`, identical each time |
+| Body | Your JSON | A `400`, or a `413` over 32 MB |
+| Response | Status, headers and a JSON body | No sign at all, until a later step breaks |
 
-**The last row is the one to stare at.** A **status code** says whether the **exchange completed**. That is like the post office telling you the parcel was delivered. The **body** says what **came back**. That is what the reply letter actually says. These are two separate questions. Code that checks the first and assumes the second is the most common mistake on this material.
+Look at the last row. "Delivered" does not say what is inside. The **status code** is like that. It says whether the exchange finished. The body tells you what arrived. Those are two questions, and code that checks one while assuming the other is the commonest bug here.
 
-**ELI5.** Sending a message to Claude is like posting a letter. It needs an address, labels on the envelope, the letter itself, and a reply. A stamp saying "delivered" does not tell you what the reply says. You have to open the reply and read it.
+**ELI5.** Calling Claude is like mailing a parcel. You need an address, proof of who you are, a thing inside, and a receipt. "Delivered" does not mean the right toy is in the box.
 
 ## The Client Library Is Somebody Else's Maintained Copy of That Boilerplate
 
-**First, the idea.** A **client library** is ready-made code that does the post office paperwork for you. You could do it by hand, but then you own the upkeep.
+Anthropic ships official clients in seven languages: Python, TypeScript, C#, Go, Java, PHP and Ruby. There is also an `ant` command-line tool for scripts and hands-on use.<sup>[2]</sup> A client sends the required headers itself, so nobody has to remember the version pin or credential.<sup>[1]</sup>
 
-**What Anthropic publishes.** Anthropic publishes **official clients for seven languages**: Python, TypeScript, C#, Go, Java, PHP and Ruby. It also publishes an **`ant` command-line tool** for **shell scripting** and interactive use.<sup>[2]</sup> A client sends the required headers itself. So the version pin and the **credential** are no longer things anybody has to remember.<sup>[1]</sup>
+Think of the library as a clerk who fills in your forms. It uses the same endpoint and model as a handwritten call, so answers are no better. What moves is who owns the dull jobs:
 
-**What stays the same.** The library and a hand-written HTTP call reach the **same endpoint and the same model**. The **answer does not get better**. What changes is **who owns the boring parts**. There are more of them than you would guess:
-- Errors arrive as **typed exceptions** (named error classes) instead of raw JSON. The documentation says to **catch those classes** instead of matching on message text, **most specific class first**.<sup>[3]</sup>
-- A **retry policy** is already there.
-- List endpoints come with an **iterator that follows the page cursor**.<sup>[1]</sup>
-- Non-streaming message requests are checked against a **ten-minute ceiling** before they are sent. The socket is set up with **TCP keep-alive**, so an idle network path is less likely to drop under the call.<sup>[3]</sup>
-- The **`request-id`** on every response is exposed as a property, not buried in a pile of headers.<sup>[3]</sup>
+- Errors are typed exceptions, not raw JSON. The docs say to catch the classes, most specific first, not match message text.<sup>[3]</sup>
+- Retries are built in.
+- Paged lists come with an iterator that walks the cursor for you.<sup>[1]</sup>
+- Non-streaming messages are checked against a ten-minute ceiling before sending, and TCP keep-alive helps an idle path survive mid-call.<sup>[3]</sup>
+- Each `request-id` is a readable property, not buried in headers.<sup>[3]</sup>
 
-None of that is hard. All of it is **maintenance**, and the cost lands on whoever wrote the code.
+None of that is hard. It is upkeep, and it falls on whoever wrote the client.
 
-**Three anti-patterns (things that look smart and are not).**
-- **The hand-rolled client.** It is tempting because the first version works. A **general HTTP library**, three headers typed out, a JSON body, done in twenty minutes. What you built is a **private fork** of a library nobody wanted to own. Now you have to **track the API by hand**, forever, at whatever priority that work gets.
-- **The foreign client plus a translation shim.** It usually shows up dressed as portability. Anthropic does publish libraries that expose Claude through another framework's surface, including a path that speaks the OpenAI SDK's shape. It says plainly that these are not **general-purpose Messages API clients**.<sup>[2]</sup> A shim gives you a second API's rules and **one more layer to debug through**. In return you get a provider switch nobody has scheduled.
-- **The subprocess call.** The command-line tool is documented for **shell scripting and interactive use**.<sup>[2]</sup> A service that runs it once per request gives up **typed errors and connection reuse**. It pays for a process boundary on every call instead.
+Three anti-patterns follow. Each skips the clerk.
 
-**ELI5.** A client library is a helper who fills in the post office forms for you and keeps up with changes to them. You could fill them in yourself. But then every change is your problem, and the parcel gets no faster.
+The first is the hand-rolled client. It tempts because version one works. Pick any HTTP library, type three headers, send JSON, and you are done in twenty minutes. You have built a private fork of a library nobody wanted, and you now follow every API change by hand.
+
+The second is a foreign client plus a translation shim. It usually arrives as "portability". Anthropic does publish libraries that expose Claude through another framework, including one shaped like the OpenAI SDK, and says they are not general-purpose Messages API clients.<sup>[2]</sup> A shim adds a second API's rules and one more layer to debug, for a provider switch nobody has scheduled.
+
+The third is the subprocess call. That tool is for scripts and hands-on use.<sup>[2]</sup> A service that launches it for each request gives up typed errors and connection reuse, and starts a new process every time.
+
+**ELI5.** A client library is a clerk who fills in the post-office forms for you. You could do it yourself, but then you must keep up when the rules change.
 
 ## Retries Default to Two Attempts, and Two Is a Setting Rather Than a Law
 
-**First, the idea.** When a call fails for a reason that has nothing to do with your request, the official clients try again on their own. That is a **retry**. How many times is a setting you can change.
+Suppose the delivery truck breaks down. Your parcel is fine. Official clients retry transient failures with exponential backoff, which means waiting longer after each try. The default is twice. They obey a `retry-after` header when the service sends one. Every client has a maximum-retries option that adjusts the count or switches retrying off.<sup>[3]</sup> The list of retried failures is fixed: any connection error, `408`, `409`, `429`, and every code from 500 up.<sup>[4]</sup>
 
-**What the clients do.** The official clients **retry transient failures** (failures that may pass on their own) with **exponential backoff** (waiting longer after each failed try). The default is **two retries**. They honour a **`retry-after` header** when the service sends one. Every client has a **maximum-retries option** that **adjusts or switches off** this behaviour.<sup>[3]</sup> The retried set is named too: **connection errors of any kind**, `408`, `409`, `429`, and anything at or above 500.<sup>[4]</sup> In the post office picture, this is the delivery van going back out after a breakdown.
+A default exists, and you can change it. Scenarios turn on one half.
 
-Both halves of that sentence matter. Exam scenarios almost always turn on one of them.
-
-| Claim about the library's retries | Verdict |
+| What someone says | Verdict |
 |---|---|
-| Nothing happens unless application code does it | Wrong. A default policy ships and runs |
-| Something happens and nothing can change it | Wrong. Maximum retries is a client option, and zero disables it |
-| Connection faults retry, throttling passes through | Wrong. Throttling is in the retried set, and it is the common case |
-| A default exists and a setting adjusts it | Correct, and the only description that fits a client library |
+| Nothing happens unless your code retries | Wrong. A default policy runs |
+| It runs but is locked | Wrong. You can set the maximum, even to zero |
+| Only network faults retry | Wrong. Throttling retries too, and it is the common case |
+| A default exists and a setting changes it | Right, the only fit for a client library |
 
-What to tell a teammate sits between the two obvious answers. A **policy is already running**, whether or not anybody chose it. A team on a **tight latency budget** can **turn it down** or off in one line.
+Tell your teammate this: a policy is running whether or not anyone picked it. A team on a tight latency budget can turn it down, or off, in one line.
 
-**Anti-pattern: a retry loop wrapped around a retry loop.** This is plain arithmetic. Three attempts of your own around a default of two gives **nine trips** to a service that has already asked for a pause. Nobody writes that on purpose. It happens because the person who wrote the outer loop assumed the inner one did not exist.
+The anti-pattern is a retry loop around a retry loop. Wrap three of your own attempts around the default of two and you make nine trips to a service that wanted you to slow down. Nobody plans this. The outer loop's author did not know the inner one existed. It is two clerks re-sending the same parcel.
 
-**Two more traps nearby.**
-- A **timeout set across a whole request lifecycle** does not **restart** when the library retries.<sup>[4]</sup> So a generous outer deadline can run out in the middle of a retry that was about to work.
-- Not every `429` is temporary. One raised by a **usage tier's spend cap** carries no **`retry-after` header**. It keeps failing until access is restored.<sup>[3]</sup> So an **unbounded retry loop** against it turns a **billing problem into an outage**.
+Two traps live close by.
 
-**ELI5.** If the delivery van breaks down, the post office sends it out again by itself, two more times. You can ask for more tries or none. Do not hire your own extra vans on top, because then the same parcel gets sent nine times. And if the account is out of money, trying again forever never helps.
+- A timeout over the whole request lifecycle does not restart on a retry.<sup>[4]</sup> A generous deadline can expire just before a retry would have worked.
+- Some `429` errors will not clear. A usage tier's spend cap raises one with no `retry-after` header, and it fails until access returns.<sup>[3]</sup> Retrying without a limit turns a billing problem into an outage.
+
+**ELI5.** When the mail truck breaks down, the post office tries again on its own, twice. You can ask for more or fewer. If you also keep re-sending the parcel, it goes out again and again.
 
 ## Persistent and Two-Way Are Separate Properties, and Only One Needs a WebSocket
 
-**First, the idea.** People say "real time" and reach for a **websocket** (a connection that stays open and lets both sides send at any time). That is the wrong trigger. Two separate properties decide the shape. How long does the relationship last? And can both sides send messages that nobody asked for?
+Compare a phone call with a mailbox. At the words "real time", teams grab a **websocket**. That is the wrong cue. Two separate properties pick the shape: how long the link lasts, and how many directions carry messages nobody requested.
 
-In post office terms, a normal call is one letter and one reply. A websocket is a standing phone line that either end can speak into.
-
-| Shape | Who can send unprompted | What it costs | When it fits |
+| Shape | Sends unprompted | Cost | Fits |
 |---|---|---|---|
-| Request and response | Neither end | One connection setup per exchange | A question with one answer |
-| Repeated polling | Neither end | Request volume, and staleness bounded by the interval | Cheap checks on something that changes slowly |
-| Held-open one-way response | Server only | A connection tied up for the length of the response | Output arriving in pieces while a human waits |
-| WebSocket | Both ends | A connection to keep alive, reconnect and monitor | A long-lived exchange where both ends push |
+| Request and response | Neither side | New connection each time | A single question |
+| Repeated polling | Neither side | Many requests, data as old as the interval | Cheap checks on slow data |
+| Held-open one-way response | Server only | Connection busy until the reply ends | Text appearing in pieces for a waiting person |
+| WebSocket | Both sides | Keep-alive, reconnecting and monitoring | Long exchange with pushes both ways |
 
-**When a websocket fits.** Read down the first column. Updates arrive as they happen, from the other end, without being asked. Messages go back over the same connection. The relationship lasts minutes or hours, not milliseconds. That mix is what a websocket was built for. Every substitute brings back something the websocket was meant to remove.
+Read down the first column. News arrives the moment it happens, from the other side, unrequested. Replies use the same connection. The link lasts minutes or hours, not milliseconds. A websocket exists for that mix, and each substitute brings back what it removed.
 
-**Polling (the substitute people accept without noticing).** Polling means asking again and again, like walking to the post office every five minutes to ask "anything for me?" A shorter interval buys **freshness with request volume**. The interval never reaches zero, so the data is always as old as the gap between checks. **Polling relabelled as real time** is the anti-pattern. The tell in a scenario is a fix that gets better when a **number gets smaller**.
+Polling slips in unnoticed. It is walking to the mailbox every five minutes. A shorter interval buys freshness with extra requests, and never reaches zero, so data is always as old as the gap between checks. Polling relabelled as real time is the anti-pattern. The tell is a plan that improves when a number shrinks.
 
-**The held-open response (the subtler substitute).** An ordinary **HTTP response held open** carries **data one way**, from the server to you. Claude's own streaming works exactly like this, over **server-sent events**.<sup>[5]</sup> Chapter 3 covers what that means for reading a message. It is the right shape for **output arriving piece by piece**. It is not a two-way channel. Your only way to say anything back is to **open a fresh request**, which is the cost a persistent connection was meant to remove. So treating a held-open response as a two-way channel is worth naming as a mistake.
+The other substitute is subtler. A held-open HTTP response moves data in one direction only. Claude's own streaming works this way, through **server-sent events**.<sup>[5]</sup> Chapter 3 covers reading one. It suits output arriving bit by bit. But it is no channel. To reply you open a new request, the very cost a persistent connection removes. Name this too: a held-open response treated as a two-way channel.
 
-**Where Anthropic uses the real thing.** An **MCP tunnel** connects Claude to servers inside a **private network** over an **outbound-only connection**. So no **inbound firewall port** has to be opened and nothing is exposed to the public internet.<sup>[6]</sup> The encrypted handshake to the customer's proxy is then carried inside that **tunnel's WebSocket stream**.<sup>[7]</sup> Which **end opened the connection** and which end sends over it are two different facts. Mixing them up is how a security review ends up asking for a **firewall change nobody needs**.
+Anthropic uses it where both properties apply. An MCP tunnel joins Claude to servers inside a private network over an outbound-only connection, so no inbound firewall port opens and nothing faces the public.<sup>[6]</sup> The encrypted handshake with the customer's proxy is carried within the tunnel's WebSocket stream.<sup>[7]</sup> Which end opened the connection and which end sends over it are different facts. Mix them up and a security review asks for a firewall change nobody needs.
 
-**ELI5.** Asking "anything for me?" over and over is polling. It is always a little out of date. A phone line that stays open lets either side speak the moment something happens. Only use the phone line when both sides really need to speak first.
+**ELI5.** A phone call stays open and either person can speak. A mailbox needs you to keep walking over. A radio lets only one side talk.
 
 ## Three Seams, and Only the Middle One Deserves Another Attempt
 
-**First, the idea.** A **seam** is a place where one part hands off to the next. In the post office picture, a parcel can go wrong at the counter, on the road, or in the reply. Every failure in the four-part call lands in one of **three seams**. **Naming the seam first** is the whole diagnostic skill. Each seam has its own fix, and each gets worse under the fix that belongs to its neighbour.
+Back to the parcel. The label can be wrong, the truck can break, or it can arrive with the wrong thing inside. A failure in the four-part call lands in one of three seams. Naming the seam first is the main debugging skill, because each seam needs its own fix and gets worse under a neighbour's fix.
 
-| Seam | How it announces itself | What repairs it | What makes it worse |
+| Seam | Looks like | Fix | Makes it worse |
 |---|---|---|---|
-| Integration (the counter) | `400`, `401`, `403`, `404`, 413. Identical on every attempt<sup>[3]</sup> | Fix the request, the credential or the size | Backoff, which pays repeatedly for the same answer |
-| Transport (the road) | Connection faults, `429`, `500`, 529. Intermittent, clustering under load<sup>[3]</sup> | Bounded retries with backoff, honouring `retry-after` | A tighter loop, and no ceiling on attempts |
-| Output (the reply) | HTTP `200`, and the content is unusable | Validation, a schema, a fallback model | Reading the status code and stopping there |
+| Integration | `400`, `401`, `403`, `404`, 413; repeats identically<sup>[3]</sup> | Correct the request, key or size | Backoff, paying again for one answer |
+| Transport | Connection faults, `429`, `500`, 529; intermittent, heavier under load<sup>[3]</sup> | Capped retries with backoff, respecting `retry-after` | A faster loop, or no cap |
+| Output | `200` OK, but the content is no use | Validation, a schema, a fallback model | Trusting the status code |
 
-**The integration seam (the counter).** This seam belongs **entirely to the caller**. Its signature is **determinism**: the same bytes fail the same way at three in the morning as they did in the test. A `413` past the **32 MB request ceiling** will never work on the fourth attempt.<sup>[3]</sup>
+The **integration seam** is the wrong label on the parcel. It is wholly the caller's. Nothing varies. A request that failed in testing fails at three in the morning too. A request over the 32 MB limit gets a `413` and will not pass on try four.<sup>[3]</sup>
 
-**The transport seam (the road).** This is what the library's retry policy is for. It is the only seam where trying again is a **reasoned act, not a hope**. A **`529`** reports the service is **temporarily overloaded**. A `500` carries the documented instruction to retry with **exponential backoff**.<sup>[3]</sup>
+The **transport seam** is the broken truck. The library's retry policy exists for this. Only here is another attempt reasoned, not hopeful. A `529` says the service is temporarily overloaded. For a `500`, the docs say to retry with exponential backoff.<sup>[3]</sup>
 
-**The output seam (the reply).** This is where developers get hurt, because **everything above it worked**.
-- A **refusal arrives as a successful `200`** response carrying a **`stop_reason` of `refusal`**. The usual fix is to send the same request to a **different model**, not to treat the response as an error.<sup>[8]</sup>
-- With a streamed response it is worse. An error can happen after the API has **already returned a `200`**, so it does not come through the normal error path at all.<sup>[3]</sup>
-- A person reading a log line **cannot tell a refusal from an answer** unless somebody wrote code to record which one it was.
+The **output seam** is the wrong thing in the box. It hurts most because everything earlier worked. When Claude refuses, you still get a successful `200`, with `stop_reason` set to `refusal`. Usually you send the same request to another model.<sup>[8]</sup> Streaming makes it sharper. An error can occur after the API already returned a `200`, so it never reaches the usual error path.<sup>[3]</sup> In a log, a refusal looks like an answer unless your code marked which was which.
 
-**One cheap habit.** Every response carries a **`request-id`**. Support asks for it because it is the only **handle that identifies a single call**.<sup>[1]</sup> It is like the tracking number on a parcel. **Log it on failure** and a bug report stops being a story about a bad afternoon.
+One free habit finishes this. Every response has a `request-id`, the tracking number on the parcel. Support asks for it because it is the only handle that points at one call.<sup>[1]</sup> Log it on failure, and your report stops being a story about a bad afternoon.
 
-**ELI5.** A parcel can go wrong in three places. The counter might turn it away, and trying again will not help. The road might be blocked, and trying again later can work. Or the reply might arrive looking fine but say "sorry, can't help". Work out which place it went wrong first. Then pick the fix.
+**ELI5.** A parcel can fail three ways. The address is wrong, so resending never helps. The truck broke, so trying again can work. Or it holds the wrong thing, and you only learn by opening it.
 
 ## Eleven Documented Codes, and the Seam Each One Belongs To
 
-**First, the idea.** The seam is what you carry into a question. The **status codes** are a lookup table. A table you half remember is worse than none, because it **sorts confidently** into the **wrong seam** and then applies that seam's fix.<sup>[3]</sup>
+Take the seam into the exam. The codes are a lookup, and a half-remembered one is worse than none. It puts a code in the wrong seam with full confidence, then applies the wrong fix.<sup>[3]</sup>
 
-**Seven codes: the request, the credential or the account is wrong.** Another attempt changes nothing for any of them.
+Seven codes mean your request, credential or account is wrong. Retrying fixes none.
 
-| Code | Error type | What it means |
+| Code | Error type | Meaning |
 |:----|:------------------|:--------------------------|
-| `400` | `invalid_request_error` | The format or content of the request, and the catch-all for 4XX codes with no entry of their own |
-| `401` | `authentication_error` | The key is malformed, revoked or expired |
-| `402` | `billing_error` | Billing or payment details need attention |
-| `403` | `permission_error` | The key is genuine and is not entitled to this resource |
-| `404` | `not_found_error` | The endpoint path, or a resource id inside the URL |
-| `409` | `conflict_error` | A concurrent modification, or a unique value already taken |
-| `413` | `request_too_large` | Past the byte ceiling for that endpoint |
+| `400` | `invalid_request_error` | Bad format or content; also the home of unlisted 4XX codes |
+| `401` | `authentication_error` | Key is broken, revoked or out of date |
+| `402` | `billing_error` | Payment details need a look |
+| `403` | `permission_error` | Valid key, wrong permissions |
+| `404` | `not_found_error` | No such path, or no such id in the URL |
+| `409` | `conflict_error` | Writes collided, or a unique value is taken |
+| `413` | `request_too_large` | Bigger than the endpoint allows |
 
-**Four codes: the service, or the pace you call it at, is the issue.** Waiting is part of every fix.
+Four codes blame the service or your call rate. Waiting is part of each fix.
 
-| Code | Error type | What it means |
+| Code | Error type | Meaning |
 |:----|:------------------|:--------------------------|
-| `429` | `rate_limit_error` | A rate limit, a monthly spend cap, or a workspace spend limit |
-| `500` | `api_error` | A fault inside Anthropic's own systems |
-| `504` | `timeout_error` | The request timed out while being processed |
-| `529` | `overloaded_error` | The service is temporarily overloaded |
+| `429` | `rate_limit_error` | Rate limit, monthly cap or workspace spend limit |
+| `500` | `api_error` | Anthropic's own systems failed |
+| `504` | `timeout_error` | Processing took too long |
+| `529` | `overloaded_error` | Service briefly swamped |
 
-**Three of the eleven are worth a second look.**
-- **`400` is a catch-all, not a diagnosis.** It covers **4XX codes** that have no entry of their own. A **spend limit** you set on your own organisation or workspace returns one. The exception is a **Claude Code workspace**, which can answer `429` instead.<sup>[3]</sup> So a `400` is no proof that a body is malformed. A scenario that pairs one with a spend limit is not describing a broken request.
-- **`401`, `402` and `403`** all say the **caller may not go ahead**, for **three unrelated reasons**. The **key is bad**. Or the account owes money. Or the key is fine but **lacks this one permission**. That is three fixes, and none of them is another attempt.
-- **`409` is the exception in the first table.** The client **retries connection errors**, `408`, `409`, `429` and `500` or above by default.<sup>[4]</sup> That looks like a contradiction until you see what a **conflict** is: a state some other writer may already have let go of. Retrying it is the documented fix.<sup>[3]</sup> Every other code in that first table fails the same way forever.
+Three of the eleven deserve a second look.
 
-**ELI5.** The codes are like stamps the post office puts on a returned parcel. Some mean "your form is wrong", so fix the form. Some mean "we are busy", so wait and try again. A few look alike but mean different things, so learn them one by one.
+First, `400`. It is a catch-all, not a diagnosis. It takes 4XX codes that have no entry of their own. Your own organisation or workspace spend limit returns one, except on a Claude Code workspace, which can return `429`.<sup>[3]</sup> So a `400` does not prove a malformed body.
+
+Second, `401`, `402` and `403`. Each says the caller cannot continue, for three unrelated reasons: a bad key, an unpaid account, or a good key missing this one permission. That is three repairs. A retry is not one of them.
+
+Third, `409`, the odd one in the first table. The client retries `409` by default, along with connection errors, `408`, `429` and `500` or above.<sup>[4]</sup> That seems to clash until you see what a conflict is: something another writer may already have let go. Retrying is the documented fix.<sup>[3]</sup> The rest of that table fails identically forever.
+
+**ELI5.** Each code is a stamp on your parcel. Most say "you made a mistake, fix it first". A few say "we are busy, try later".
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on integration questions almost never describe something impossible. They describe a **real technique**, explained correctly, but used **one seam over** from where it belongs.
+Wrong answers here are seldom impossible. They are real techniques applied one seam over. Three assumptions cause most.
 
-**The assumptions behind most wrong answers.**
-- **A library is either absent or immovable.** Options split into "your code must do this itself" and "the library does this and you cannot change it". Both miss what a client library really is: a **documented default with a setting** on it. When a scenario asks what happens to **transient failures**, the answer that holds up says a **default runs** and **can be configured**.
-- **Freshness bought with request volume, sold as a connection.** An option that keeps asking is offered against a **requirement to be told**. It is a fine design for **slow-moving data**. It is the **wrong shape** when the **other end knows first**, because **latency stays tied** to whatever **interval somebody picked**.
-- **A status code read as a verdict on the content.** Options that **treat `200` as success** and **everything else as failure** ignore a **whole seam**. The scenarios that punish this are the ones where the **pipeline broke downstream** of a call that **never errored**.
-- **A heavier integration preferred to the maintained one.** Building on a **general HTTP client**, wrapping a **different provider's library**, or **running a separate process** all look like good engineering. Ask what each one now has to **track by hand** as the API moves.
+- A library is missing or fixed. Choices split into "your code must do it" and "the library does it and you cannot change it". Both miss the truth: a documented default with a setting. For transient failures, the surviving answer says a default runs and can be configured.
+- Freshness paid for with request volume, sold as a connection. Asking again and again is offered where you need to be told. It suits slow data. It is wrong when the other end knows first, because delay stays stuck at whatever interval someone chose.
+- A status code read as a ruling on the content. Options calling `200` success and all else failure skip a whole seam. Scenarios punish this when a pipeline breaks after a call that never errored.
+- A heavier integration chosen over the maintained one. A general HTTP client, another provider's library or a shell-out can pass for good judgement. Ask what you now follow by hand when the API changes.
 
-**Match on what the scenario is doing, not on the domain it is set in.**
+Match on what the scenario does, whatever domain it is set in.
 
-| When the scenario says | The answer is usually | The trap is usually |
+| Scenario says | Usual answer | Usual trap |
 |---|---|---|
-| A service pushes updates continuously and the app also sends messages back | A protocol built for a persistent two-way connection | Any option whose freshness depends on how often you ask |
-| A teammate asks whether application code needs its own retry logic | A default policy exists and the client exposes it as a setting | Calling it absent, or correct but unchangeable |
-| The language has an official Claude client and the team is starting an integration | Use the client and its documented pattern | Rebuilding headers, retries and parsing against a general HTTP library |
-| A call fails the same way on every attempt | The request, the credential or the size is wrong, and it is yours | Adding backoff to a deterministic failure |
-| Failures are intermittent and get worse under load | Bounded retries with backoff, honouring the interval the service names | A tighter loop, or retrying past a spend cap forever |
-| Nothing errored and a downstream step broke anyway | Inspect the response body and its stop reason, then validate | Treating a healthy status code as a healthy answer |
-| A status code arrives and the option sorts it by the number alone | Ask whether a later attempt could change the outcome, then repair the seam that owns it | Treating `400` as proof of a malformed body, or `409` as something retrying cannot clear |
-| Portability across model providers is offered as the reason | Cost the extra layer against a switch nobody has scheduled | A foreign client plus a translation shim |
+| Server pushes updates and the app talks back | A protocol for a lasting two-way link | Anything where freshness depends on how often you ask |
+| Teammate asks if app code needs its own retries | A default policy exists, exposed as a setting | Calling it missing, or fixed |
+| A new integration, in a language with an official client | Use that client the documented way | Redoing headers, retries and parsing on plain HTTP |
+| A call fails identically each time | Request, credential or size is wrong, and it is yours | Backoff on a failure that never changes |
+| Failures are patchy and worsen with load | Capped backoff retries that respect the stated wait | A tighter loop, or retrying a spend cap forever |
+| No error, but a later step failed | Inspect the body and stop reason, then validate | Trusting a good status code as a good answer |
+| A status code arrives and an option sorts it by number alone | Ask if a later try could change the result, then fix the seam that owns it | `400` as proof of a bad body, or `409` as unfixable by retrying |
+| Provider portability is the stated reason | Weigh the extra layer against an unscheduled switch | A foreign client plus a translation shim |
 
-**The habit that carries over.** Name the seam before you name the fix. Say out loud whether the failure is in what you **sent** (the counter), in getting it there (the road), or in what **came back** (the reply). Roughly half the options in front of you stop being plausible.
+Name the seam before the fix. Say aloud whether the failure was in what you sent, in getting it there, or in what came back. About half the options stop looking plausible.
 
-**ELI5.** Wrong answers are usually good ideas used in the wrong place. Before you pick an answer, ask where the parcel went wrong: at the counter, on the road, or in the reply. Then only look at fixes for that place.
+**ELI5.** A wrong test answer is often a good fix for a different problem, like repairing the truck when the label is wrong. Ask which failure you have first.
 
 ## What to Remember
 
-- The **four-part call** is **address, headers, body, response**. That means an endpoint and method, a **credential plus `anthropic-version` plus content type**, a JSON payload, and a reply with a **status code, headers and a body** that you read separately.
-- **Official clients exist for seven languages** and send the **required headers** for you. They reach the **same endpoint and the same model** as a hand-written call. The difference is who **maintains the parts** as the API moves.
-- **Clients retry transient failures twice by default**, with **exponential backoff**, honouring **`retry-after`** when present. **Maximum retries is an option** you can raise, lower or set to zero. A default that is **present and adjustable** is the description that fits.
-- **Retried by default**: **connection errors, `408`, `409`, `429`**, and **`500` or above**. A **retry loop around the client's own** multiplies attempts. An **outer deadline does not restart** when the library retries.
-- A **`429` from a spend cap** carries no **`retry-after`** and keeps failing until access resumes. So **retrying it forever** turns a **billing problem into an outage**.
-- **Eleven documented codes**: `400` invalid request, `401` authentication, `402` billing, `403` permission, `404` not found, `409` conflict, `413` too large, `429` rate limit, `500` internal, `504` timeout, `529` overloaded. **`409`** is the only one **shaped like an integration failure** that the client **retries by default**, because the **conflicting state can clear**.
-- **Persistent and two-way are separate properties.** **Polling** leaves staleness **tied to the interval**. A **held-open response pushes one way only**, server to client. A **websocket keeps one connection** on which **both ends send unprompted**.
-- **Three seams break a call**: **integration** (4xx, identical every attempt, yours to fix), **transport** (connection faults and 5xx, intermittent, retry with backoff), and **output** (**HTTP `200` with unusable content**, fixed by validation or a different model).
-- A **refusal is a successful `200`** carrying **`stop_reason: refusal`**, and a **streamed error can arrive after the `200`**. That is why **status-code-only error handling misses an entire seam**.
-- **Every response carries** a **`request-id`**. **Log it on failure**, because it is the **only identifier that names a single call** when you report one.
-
-**ELI5.** Every call is a parcel with an address, labels, a letter and a reply. It can go wrong at the counter, on the road, or in the reply. Only road problems are worth trying again. Always keep the tracking number.
+- The **four-part call**: address, headers, body, response. Headers hold a credential, `anthropic-version` and content type. The reply has a status code, headers and a body to read separately.
+- Official clients cover seven languages and send the required headers. Only the upkeep changes hands.
+- Clients retry transient failures twice by default, with exponential backoff, obeying `retry-after`. Maximum retries can go up, down or to zero.
+- Retried by default: connection errors, `408`, `409`, `429`, and `500` or above. Loops stacked on the client's multiply attempts. An outer deadline does not restart.
+- A spend-cap `429` has no `retry-after`. Retrying forever causes an outage.
+- Eleven codes: `400` invalid request, `401` authentication, `402` billing, `403` permission, `404` not found, `409` conflict, `413` too large, `429` rate limit, `500` internal, `504` timeout, `529` overloaded. Only `409` looks like an integration failure yet is retried, because the conflict can clear.
+- Persistent and two-way are separate. Polling pins staleness to the interval. A held-open response is one-way. A websocket lets both ends send unprompted.
+- Three seams: integration (4xx, identical each time, yours), transport (connection faults and 5xx, retry with backoff), output (`200` with unusable content, fix with validation or another model).
+- A refusal is a successful `200` with `stop_reason: refusal`, and a streamed error can follow a `200`. Status-code-only handling misses a whole seam.
+- Every response has a `request-id`. Log it on failure.
 
 ## Endnotes for this chapter
-
 
 1. The Claude API is a RESTful API at `https://api.anthropic.com`; all requests must include a credential header (`x-api-key` or `Authorization`), an `anthropic-version` header such as `2023-06-01`, and `content-type: application/json`, which the client SDKs send automatically. The page also documents the `request-id` response header and the auto-paginating iterators the SDKs provide. Anthropic, *API overview* (Claude Platform Docs, accessed 2026-09-09), [https://platform.claude.com/docs/en/api/overview](https://platform.claude.com/docs/en/api/overview)
 

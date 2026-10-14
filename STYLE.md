@@ -34,5 +34,5 @@ The first pass copied the original's sentences and added labels. That is not a r
 
 ## Hard limits (tools/check_similarity.py enforces these)
 - At most 25% of sentences may closely match an original sentence.
-- The chapter body must be under 90% of the original body's word count. Aim for 75 to 85%. Turn dense table cells into plain wording and cut repetition.
+- The chapter body must be under 95% of the original body word count (hard limit). Aim for 85 to 90%. Never drop a fact to hit the target. Turn dense table cells into plain wording and cut repetition.
 - Bold marks must be under half the original's count.

@@ -1,281 +1,207 @@
 # Chapter 17: REST, Versioning, Review: the Exam Beyond Claude
 
-**Summary**: *The third-heaviest skill on this paper barely mentions Claude. It covers REST contracts, JSON that tolerates a field it has never met, concurrency you bound yourself, prompts held to the same review gate as code, a build that checks what genuinely regresses, and a migration that pins behaviour before it changes it. If you revise the model alone, these questions arrive as ordinary engineering questions in unfamiliar dress. You have nothing model-specific to answer them from. Getting one wrong costs exactly what getting a model question wrong costs, and there are more of them.*
+**Summary**: *This is the third-heaviest skill on the paper, and it hardly mentions Claude. It asks about REST contracts, JSON that copes with a field you have never met, concurrency you cap yourself, prompts that get code-style review, a build that checks only what really breaks, and a migration that locks in behaviour first. Study only the model and these arrive as plain engineering questions you cannot answer. Missing one costs the same as missing a model question.*
 
 ## Seven Named Topics in This Skill, and None of Them Is About Claude
 
-**First, the idea.** This skill is plain software engineering. The exam tests it because your code depends on a model, but the practices themselves are the ones any good engineer already uses.
+Picture a developer who knows every page about the model. Then a question describes forty call sites, a deprecated parameter and six months to fix it. That is a migration question. Claude is only the backdrop.
 
-**The analogy: your kitchen and its outside supplier.** Picture a restaurant kitchen that buys a key ingredient from an outside supplier. Your code is the kitchen. The model on the other end of the call is the supplier (the **model-shaped dependency**). Every section below is a normal kitchen habit, adjusted for this one supplier. The exam uses the real words, so each analogy word comes with its real term in bold.
+The blueprint names seven topics. **REST APIs**. **JSON**. **Asynchronous programming**. **Version control**. **Lifecycle integration**. **Code review**. **Refactoring**, both small and large. None is specific to Claude. A good engineer does all of them on a normal Tuesday.
 
-**What the blueprint says.** Here is the blueprint clause this chapter owns, with nothing removed. **REST APIs**. **JSON**. **Asynchronous programming**. **Version control**. **Lifecycle integration**. **Code review**. **Refactoring**, at small and large scale.
+Good practice does not change when a model is involved. What changes is the thing you call. Think of a supplier across town. You phone in orders, pay per delivery, and the supplier rewrites the catalogue on their own timetable. Call this a **model-shaped dependency**. It is remote, its answers vary, it bills per call, and its versions retire on a schedule you do not control. It can also fail while reporting success.
 
-Not one of those is a **Claude topic**. All of them are what a **competent engineer** does on an **ordinary Tuesday**. Together they are the **third-heaviest skill** on the paper.
-
-**The revision failure.** That combination causes a very predictable failure. Somebody reads every **published page** about the model. They arrive well prepared on windows, tokens and tool schemas. Then they meet a scenario about **forty call sites**, a **deprecated parameter** and a **six-month window**. The scenario is about **migration risk**. Claude is the **set dressing**. A developer who has been revising the set dressing has nothing to bring.
-
-**What changes because of the supplier.** The practices do not change because a model is in the system. What changes is which **properties of the dependency** each practice has to account for. There are five worth holding. Call the thing on the other end of the call a **model-shaped dependency** (the supplier). It is:
-- **remote** (the supplier is across town, not in your kitchen)
-- **variable** in what it returns (no two deliveries look the same)
-- **billed by the call** (you pay per delivery)
-- **versioned on a schedule** nobody in the room controls (the supplier changes the catalogue when they decide to)
-- perfectly capable of **failing while reporting success** (a delivery note says "delivered" and the box is wrong)
-
-| Property of the dependency | What it changes about ordinary practice |
+| Property | What it does to normal practice |
 |---|---|
-| Output varies between runs on identical input | A test asserting exact equality reports noise rather than regressions |
-| Every call costs money in proportion to its size | Token spend becomes a regression class, alongside latency |
-| Versions retire on the publisher's schedule | Migration is scheduled engineering work, not maintenance |
-| A failure can arrive as a well-formed answer | Error handling that reads only the status code misses a seam |
-| Behaviour is defined in prose rather than in control flow | Prompt text is code and has to live where code lives |
+| Same input, different output on different runs | A test that demands an exact match gives you noise, not real failures |
+| Each call costs money by size | Token spend can regress, just as latency can |
+| The publisher retires versions on their calendar | Migration is planned work, not upkeep |
+| A failure can look like a good answer | Checking only the status code leaves a gap |
+| Behaviour lives in prose, not control flow | Prompt text is code and belongs where code lives |
 
-Read those **five rows** as the agenda for **everything you revise** on this skill. Every section that follows is a **standard practice** with one of them fed into it.
+Each section below is an ordinary habit with one of these rows mixed in.
 
-**ELI5.** Your kitchen buys one ingredient from a supplier far away. The supplier charges per delivery, never sends the same thing twice, changes their catalogue on their own timetable, and sometimes sends the wrong box with a happy note. Good kitchen habits still work. You just have to adjust each one for that supplier.
+**ELI5.** A friend sells you sandwiches. Each tastes a bit different. You pay every time. One day he stops making your favourite. You plan for that.
 
 ## A Contract Is What Is Promised Plus What Is Reserved
 
-**First, the idea.** A **contract** (the supplier's catalogue and terms) has two halves. One half is what the supplier promises. The other half is what the supplier has kept the right to change.
+Chapter 2 covers the parts of a call. Chapter 3 covers the endpoints. Under both lies a sharper question that exams like. What does the publisher promise, and what did they keep the right to change? In the supplier picture, this is the small print on the order form.
 
-Chapter 2 sets out the parts of a call and chapter 3 sets out the endpoints. The **engineering question** underneath both is narrower, and it is the one scenarios reach for. What does this **contract promise**, and what has it **reserved the right to change**?
+The promises are plain. You reach Claude through a **RESTful API**. Requests and responses are JSON. Each response carries an identifier for that one call.<sup>[1]</sup> The service is stateless, which comes from REST and not from the model. It remembers nothing between calls. If you want continuity, your code must provide it.
 
-**What is promised.** The promised half is unremarkable, and that is the point. Claude is reached over a **RESTful API** (the order desk). **Requests and responses are JSON** (the order slips and delivery notes), and every response **carries an identifier** for that single call.<sup>[1]</sup> **Statelessness** (the supplier forgets you between orders) comes with the style rather than with the model. The **service keeps nothing between calls**, so continuity is a property your code supplies or does not have.
+The kept-back rights start with versions. Every request must send an `anthropic-version` header. Anthropic recommends the latest version. Older ones count as deprecated and may be closed to new users.<sup>[2]</sup> Pinning a version does not freeze the service. It only means any change was someone's decision.
 
-**Where the reservation starts.** Versioning is where the reservation starts. An **`anthropic-version` header is required** on every request. The **latest version is recommended**. Earlier versions are treated as **deprecated** and may be unavailable to new users.<sup>[2]</sup> A **pinned version** (writing the catalogue edition on your order) does not freeze the service. It makes a change something **somebody chose**.
+Here is the part that decides questions. An error comes back as JSON holding a type, a message and a request identifier. The versioning policy says the values in those objects may grow over time.<sup>[3]</sup> Act on the values you know. Add a default branch for anything else. Log the identifier, not the wording.
 
-**The reservation itself.** This is the part that decides scenarios. **Errors come back as JSON** carrying a **type, a message and a request identifier**. The documented versioning policy says plainly that the set of values inside those objects may **grow over time**.<sup>[3]</sup> A publisher who says that has told you how to write the consumer:
-- **Branch on the values you know.**
-- Keep a **default arm** for everything else.
-- Log the identifier rather than the prose.
+Now the trap. A careful engineer writes a switch covering every error value in the docs. Nothing is left out, so the reviewer approves. But the list belongs to the publisher, who can add to it. The first new value hits a branch that is not there, and the bug appears far from its cause. Matching on message text breaks the same way, because wording is not part of the contract. The typed exception classes are.<sup>[3]</sup>
 
-**The anti-pattern: the exhaustive switch.** The **exhaustive switch over somebody else's enumeration** is the **anti-pattern**, and careful people write it. Every **documented value is handled**. Nothing falls through. The reviewer approves it because it looks complete. But it is complete against a list the publisher **reserved the right to extend**. So the first new value lands in a branch that does not exist, and the failure surfaces somewhere unrelated. The same reasoning kills error handling that **matches on message text**. Message wording is not the contract. The **typed exception classes** are.<sup>[3]</sup>
+JSON follows the same rule in small. Read fields by name. Skip fields you do not know instead of failing on them. A field that is missing and a field that is null say different things, so keep them apart.
 
-**JSON discipline.** This is the small version of the same rule.
-- **Read fields by name.**
-- Ignore what you do not recognise rather than rejecting it.
-- Treat a **field's absence** and a **field's null** as the two different statements they are.
-
-**ELI5.** A supplier's catalogue says what they promise. It also says they may add new items later. So when a box arrives with an item you do not know, you do not refuse the whole delivery. You deal with the items you know, and you have a plan for the rest.
+**ELI5.** The supplier says new kinds of problems may show up. So keep a catch-all for the ones you do not know.
 
 ## Concurrency Is a Property of Your Process, Not a Feature of the Service
 
-**First, the idea.** "Asynchronous" means two different things on this syllabus, and this section is about only one of them.
+"Asynchronous" means two unrelated things here, and questions pull them apart on purpose. One is a service that takes a big pile of work and hands results back later. Chapter 3 covers that. It earns a discount, not speed. The other is how your own code is written. This section is about that one.
 
-**The two meanings.** The word **asynchronous covers two unrelated things**, and scenarios separate them on purpose.
-- One is a service that accepts a pile of work and returns results later. Chapter 3 covers it. It buys a **discount rather than speed**.
-- The other is the **programming model inside the caller** (how your kitchen handles many orders at once). That is what this clause is about.
+A thread that waits on a network call does nothing while it waits. Non-blocking code instead fires off many calls, does other work in the gaps, and deals with each answer when it arrives. You phone in many orders without standing at the door for each. You are overlapping the waiting, not computing in parallel. That is why one process can have hundreds of calls out at once without hundreds of cores.
 
-**Overlapping waiting.** A thread waiting on a network round trip is doing nothing at all. **Non-blocking work starts many calls**. It **keeps the process useful** while each one is in flight, and it handles every result as it lands. Concurrency here is **overlapping waiting**, not **parallel computation**. That is why a single process can hold **hundreds of outstanding calls** without owning hundreds of cores. Think of one cook who places many orders with the supplier and does other prep while the deliveries are on their way.
+Four consequences matter.
 
-**Four consequences** follow, and **high-volume scenarios** turn on all of them.
+One, you set the limit that actually applies. Suppose a loop starts ten thousand calls together. It meets the rate limit as a wall. Each rejected call then spends retry budget that the waiting calls also need. A **bounded pool of workers** turns a burst into a steady rate.
 
-**1. The limit that governs is the one you set.** A comprehension that launches ten thousand calls at once does not discover its ceiling gently. It meets the **rate limit as a wall**. Every rejected call spends retry budget that the calls behind it now need. A **bounded pool of workers** (only so many order slips out at once) converts a **burst into a rate**. A rate is the shape the service is priced and provisioned for.
+Two, answers do not come back in the order you sent them. Once work overlaps, a result has no built-in tie to its request. So give each job a key. The key returns with the result, and you match on it. If you match by position in a shared list instead, you may update the wrong customer and see no error at all.
 
-**2. Completion order is not submission order.** The moment work overlaps, a result arrives with no positional relationship to the request that caused it. So each unit of work **carries a key**, the key comes back with the result, and you **join on the key**. An index into a shared list is where the wrong customer record gets updated by code that **raised no error**.
+Three, retries and concurrency multiply each other. The retry budget is one pool shared across the process. If every worker retries by itself against a limit they all caused, the limit stays tripped. Your logs then look like a service outage.
 
-**3. Retries and concurrency multiply.** Retry budget is one **shared resource** across the whole process. Workers that each retry independently against a limit they are collectively causing will **hold that limit open indefinitely**. The log will show a service problem rather than a client one.
+Four, a retried call must be harmless to repeat. Concurrency makes retries routine. Say a job saves a record, charges an account or sends a message. It needs a key the receiver can use to see it already handled that job. Without one, a correct client and a correct service still create the record twice. Neither log shows an error.
 
-**4. A retried call has to be safe to repeat.** Concurrency turns a rare retry into a routine one. A retry stays harmless only while repeating the call is harmless. Say a unit of work writes a record, charges an account or sends a message. Then it needs a **key the receiver recognises as already handled**. Without one, the **same record gets created twice**. A client behaving correctly and a service behaving correctly did it, and neither log shows an error.
+The named failure is unbounded fan-out, and nobody usually chooses it. Someone writes the sequential version and it is slow. Starting everything at once is the fix with the least typing. If volume is high and no one is waiting on a single answer, use the service's own asynchronous submission instead of writing concurrency yourself. High volume with no one waiting is the signal.
 
-**The named failure: unbounded fan-out.** The **unbounded fan-out** is the **named failure**, and it is almost **never a decision**. Somebody writes the sequential version. It is too slow. The fix that **requires the least typing** is to launch everything. Now take work that is high volume where nobody is waiting on any individual answer. There, the cheaper move is the service's own **asynchronous submission** rather than any concurrency you write yourself. **Volume without a waiting caller** is the cue.
-
-**ELI5.** If you place ten thousand orders in one second, the supplier shuts the door on you. So you send a few at a time. Put a ticket number on every order, so you know which box belongs to which order. And if you have to re-send an order, make sure the supplier can tell it is a repeat, so they do not send two.
+**ELI5.** Ten thousand calls at once jams the supplier's line. Use a few callers. Number each order. Make sure ordering twice does not bring two sandwiches.
 
 ## Version Control Holds Everything That Decides What Ships
 
-**First, the idea.** **Version control** (the kitchen's recipe book, kept in the **repository**) should hold everything that decides what the system does in production.
+One test does the work of any file-type list. If editing it changes what the live system does, it lives in the repository next to the code. It gets tracked and reviewed like code.
 
-**The test.** The test is one sentence, and it does more work than any list of file types. If changing it **changes what the system does in production**, it **belongs in the repository with the code**, tracked and reviewed on the same terms.
+That test catches things you likely keep elsewhere.
 
-**Why it is uncomfortable.** That **sentence is uncomfortable**, because it catches artifacts you almost certainly keep somewhere else.
-
-| Artifact | Where it usually ends up | Why the repository is the right place |
+| Artifact | Where it often sits | Why it belongs in the repo |
 |---|---|---|
-| Prompt text | A string in a handler, or a database row nobody diffs | It defines behaviour, so an edit is a behaviour change with no commit behind it |
-| Model identifier | Inline at the call site | It fixes capability, price and a retirement date, and it appears in more than one file |
-| Tool and output schemas | Alongside the code, usually correctly | They are the contract downstream consumers were written against |
-| Evaluation sets and thresholds | A spreadsheet somebody owns | A pass threshold means nothing without a fixed set behind it |
-| Credentials | Wherever they were first pasted | They do not belong there at all, and chapter 22 has the reason |
+| Prompt text | In a string in a handler, or a database row no one diffs | It sets behaviour, so editing it changes behaviour with no commit |
+| Model identifier | Written inline where the call is made | It sets capability, price and a retirement date, and shows up in many files |
+| Tool and output schemas | Next to the code, normally | Downstream consumers were built against them |
+| Evaluation sets and thresholds | A spreadsheet one person owns | A pass mark means nothing without a fixed set behind it |
+| Credentials | Wherever they were first pasted | They do not belong there either, and chapter 22 says why |
 
-**Prompts are code.** Prompts are the row that gets argued about, so take it head on. A prompt is prose, and **prose feels like documentation**. *It is not documentation.* It is **behaviour-defining code**. The same input against two **prompt versions produces two different systems**. If one of those versions **never passed through a commit**, nothing in the deployment record distinguishes them. What you need is:
-- one home
-- a **tracked history**
-- a **review gate no weaker** than the surrounding code's
+People argue most about prompts, so take that head on. A prompt looks like documentation because it is prose. It is not documentation. It is code that defines behaviour. Run the same input through two prompt versions and you have two different systems. If one version skipped the commit, the deployment record cannot tell them apart. So a prompt needs one home, a tracked history, and review at least as strict as the code around it. A hand-written change log only matches reality while someone remembers to update it.
 
-A team that keeps a **hand-written change log** instead has built a record that agrees with reality only while somebody remembers to update it.
+Claude Code's own settings follow this rule. A project settings file reaches a teammate's clone and a cloud session only when it is committed. The local one beside it is added to git excludes the first time it is written, so it stays out of commits.<sup>[4]</sup> Team settings are shared by committing them. Personal machine settings are kept out on purpose.
 
-**A documented example from Claude Code.** Claude Code's own configuration shows the general rule. A **project settings file** reaches a teammate's clone and a cloud session only if it is **committed to version control**. The local variant beside it is **added to git excludes** the first time it is written, so it stays out of commits.<sup>[4]</sup> **Shared configuration** is shared by being committed. **Machine-specific configuration** is **deliberately kept out**.
+The anti-pattern is the prompt edited live in production. The tell is a team that cannot say what the system did last month.
 
-**The anti-pattern.** The **prompt edited in production** is the **anti-pattern**. Its tell is a team that can describe what the system does today and cannot say what it did **last month**.
-
-**ELI5.** If changing a recipe changes the dish, the recipe goes in the recipe book, with a note of who changed it and when. Secret passwords do not go in the book. And a note on your own cooking station stays on your station.
+**ELI5.** If changing something changes what the app does, store it with the code, with a history. A prompt counts. A password does not.
 
 ## A Pipeline Stage Earns Its Place on Two Conditions, and Most Fail One
 
-**First, the idea.** A **pipeline** (the kitchen's checks before a dish leaves) should only contain checks that earn their place.
+Adding this work to an existing build comes down to a single question. What should the build check that it does not check now? Chapter 19 covers building evaluation sets and tests. Chapter 23 covers the phases. This section covers choosing.
 
-**The one question.** Integrating this work into an **existing lifecycle** mostly means **answering one question**. What should your **build check** that it does not check already? Chapter 19 owns how **evaluation sets and tests** are built, and chapter 23 owns the phases. What belongs here is the **selection rule**.
+A stage belongs only if both of these hold. It catches a regression that would otherwise ship. And it stays green when an answer comes back worded differently but is still right. Think of checking a delivery at the door: right goods, not the same box colour as last week. Three stages pass both tests on this kind of system.
 
-**Two conditions.** A stage **earns its place on two conditions** at once.
-- It has to **catch a regression** that would otherwise ship.
-- Its **green result** has to survive an answer that comes back **worded differently** and still right.
-
-Both halves are needed. **Three stages** clear both on this class of system.
-
-| Stage | The regression it catches | What keeps it green on a reworded answer |
+| Stage | What it catches | Why it survives rewording |
 |---|---|---|
-| Scored evaluation against a versioned set | Quality falling after a prompt, model or configuration change | A score threshold, not a required output |
-| Contract tests over schemas and parsers | Tool schemas, output shapes and downstream consumers drifting apart | Shape and field agreement, independent of wording |
-| Token and cost regression check | A change that quietly multiplies tokens per request | A budget with a stated tolerance |
+| Scored evaluation against a versioned set | Quality dropping after a prompt, model or setting change | It uses a score threshold, not one required output |
+| Contract tests over schemas and parsers | Tool schemas, output shapes and consumers drifting apart | It checks shape and fields, not wording |
+| Token and cost regression check | A change that quietly multiplies tokens per request | It uses a budget with a stated tolerance |
 
-**Two stages that fail.** Now the two stages candidates reach for. Each **fails one half**.
+Two stages tempt people. Each fails half the test.
 
-**Byte-for-byte comparison** against a **stored response fails the second condition**, and it fails it immediately. Every acceptable rephrasing trips it. So it reports on runs where nothing is wrong, and a check that cries on green gets **switched off inside a week**. The **exact-match assertion** is the **anti-pattern**. Switching it off is the rational response to it, not a discipline failure.
+Comparing output to a saved response, byte for byte, fails the second test straight away. Every fair rewording trips it. It raises alarms on good runs, so people turn it off within a week. The exact-match assertion is the anti-pattern. Turning it off is the sensible reaction.
 
-**Automatic remediation fails the first condition**, in a subtler way. Say a pipeline rewrites the prompt when a score drops and **deploys the rewrite unreviewed**. It has not caught the regression. It has **deleted the signal**, along with the human judgement that the failing score existed to summon.
+Automatic remediation fails the first test, and less obviously. Say the pipeline rewrites the prompt when a score falls, then ships the rewrite unreviewed. It did not catch the regression. It erased the warning, along with the human judgement the warning existed to call.
 
-**The reproducibility problem.** There is a **reproducibility problem** sitting underneath all of this. It bites hardest when the pipeline runs Claude Code itself.
-- A **non-interactive run with `-p` loads the same context** an interactive session would. That includes anything configured in the **working directory or the home directory**.
-- It **runs a project's hooks** and connects the servers in its configuration, with no **trust dialog**.
-- Adding **`--bare` skips that discovery** entirely. That is what gives a scripted run the **same result on every machine**.
-- **`--output-format json` returns a payload** a script can branch on.<sup>[5]</sup>
+There is a reproducibility trap under all this, worst when the pipeline runs Claude Code itself. A non-interactive run with `-p` loads the same context as a normal session. That means anything set in the working directory or the home directory. It also runs the project's hooks and connects its configured servers, with no trust dialog. Add `--bare` and all that discovery is skipped, so a scripted run gives the same result on every machine. Add `--output-format json` and you get a payload a script can branch on.<sup>[5]</sup> A build step that reads whatever the host has set up cannot be repeated. One runner passes and another fails with no code change, and nobody thinks to look at the machine.
 
-The general rule under the flag: a build step that reads whatever the host happens to have configured is not reproducible. The symptom is a job that passes on one runner and fails on another with no change in your code. The code is not where anybody looks.
+Claude can run inside repository workflows. It can answer a mention on an issue or pull request, or take a prompt to run on any repository event. It signs in with a repository or organisation secret.<sup>[6]</sup> That plugs into the lifecycle you already have, not a new one.
 
-**The trigger surface.** The same principle governs the pipeline's own **trigger surface**. Claude can run inside **repository workflows**. It can respond to a **mention on an issue or pull request**, or be given a prompt to run on any repository event. It authenticates from a repository or **organisation secret**.<sup>[6]</sup> That is integration into an **existing lifecycle** rather than a lifecycle of its own.
-
-**ELI5.** A check before a dish leaves the kitchen has to do two jobs. It must catch a bad dish. And it must not complain about a good dish that is plated a little differently. A check that complains all the time gets switched off. A robot that quietly rewrites the recipe whenever a dish fails hides the problem from the chef.
+**ELI5.** A good door check asks "is this the right stuff?" not "is it identical?" A check that cries wolf gets switched off. A fixer that changes things unasked removes the alarm.
 
 ## An Automated Reviewer Produces Findings; the Merge Gate Is Still Something You Build
 
-**First, the idea.** **Code review** (the head chef tasting before a dish goes out) has two parts that people mix up. The reviewer finds problems. The gate decides what stops the dish.
+The managed review service shows the exact split that questions test. It runs when a pull request opens or on each push. Findings land as inline comments on the lines they concern. A check run appears beside the other checks. That check run always ends neutral, so branch protection never uses it to block a merge. To gate on it, your own pipeline has to read the severity breakdown from the check run and decide.<sup>[7]</sup>
 
-**The managed review service.** The managed review service is worth reading closely, because its documented behaviour is exactly the distinction scenarios test.
-- Reviews run when a **pull request opens or on each push**.
-- Findings are posted as **inline comments** on the lines they concern.
-- A check run appears alongside the other checks.
-- That check run **always completes with a neutral conclusion**, so it **never blocks a merge** through **branch protection**.
-- Gating on it means reading the **severity breakdown** out of the check run inside your own pipeline and deciding there.<sup>[7]</sup>
+This is a general pattern. A reviewer, human or machine, makes findings. A gate is a rule about which findings stop a change. They are two separate things. Install the first and think you have the second, and you hold a review no one must act on.
 
-**The general shape.** Read that as the general shape rather than as one product's configuration. A **reviewer, automated or human, produces findings**. A **gate is a rule** about which **findings stop a change**. They are **separate mechanisms**. A team that installed the first and believed it had the second has a review nobody is obliged to act on.
+Now the review itself. A teammate opens a pull request on your service. It works, but three things are missing. The prompt and model are hardcoded inline. No code handles an error from the remote service. And no tests cover the integration.
 
-**A review scenario.** Which leaves the reviewing itself, and the shape of a Claude-powered change that a review has to catch. Take the ordinary case. A teammate opens a pull request against your service. The code works. **Three things are missing**:
-- The **prompt and the model** are **hardcoded inline**.
-- There is no **handling for an error** from the remote service.
-- There are no **tests over the integration**.
+Do not rank them and let two go. Each breaks production alone, for its own reason.
 
-The temptation is to rank those and let the smaller two through. They do not rank. Each one **fails in production on its own**, and for a **different reason**.
-- **Hardcoded configuration** means the prompt and the model cannot **change without a deploy**. Neither is under review as a thing that changes.
-- No **error handling** means the first rate limit, timeout or overload becomes an **unhandled exception**. This is against a dependency that will certainly **return errors**.
-- Without tests, **nobody can demonstrate** later that either of the first two was **ever repaired**.
+- Hardcoded settings mean the prompt and model change only with a deploy, and no one reviews them as things that change.
+- With no error handling, the first rate limit, timeout or overload becomes an unhandled exception. This dependency will certainly return errors.
+- With no tests, no one can prove later that the first two were ever fixed.
 
-**The right answer.** So the answer a review has to give **asks for all three before the merge**. Every **partial answer** lets exactly one of them through.
-- **Approving because the working path works** pushes every one of them into production.
-- **Deferring the error path** to a later release holds back the only gap that breaks while users are on it.
-- Approving with a **promise to fix it yourself** is the interesting wrong answer, because it looks generous. It removes the purpose of the review. It moves the work rather than resolving it. It leaves the author no better at writing the next one. The next request repeats it.
+So ask for all three before the merge. Any partial answer lets one through. Approving because the happy path works ships all three. Deferring the error path holds back the one gap that fails while users are watching. The tricky wrong answer is approving with a promise to fix it yourself, because it feels kind. It defeats the review, moves the work without finishing it, and leaves the author no better at the next one. The next request repeats it.
 
-**What makes a change reviewable.** Underneath the specific three sits what makes any **change reviewable** at all:
-- A change that **does one thing**.
-- An **example that shows it running**.
-- A **test that proves the behaviour** rather than describing it.
-- A **short statement** of what the change **assumes about its environment**.
+Behind those three sits what makes any change easy to review. It does one thing. An example shows it running. A test proves the behaviour, not just describes it. A short note states what the change assumes about its environment. A reviewer who must first work out the author's intent will leave the review until last. So a correct change can wait for weeks.
 
-A reviewer who has to reconstruct the author's intent before evaluating it will do that last. That is why a contribution you know to be correct can sit untouched for weeks.
-
-**ELI5.** A taster tells you what is wrong with a dish. A gate is the rule that says "this problem means the dish does not go out". Having a taster does not give you a rule. And if a dish is missing three things, you ask for all three before it goes out. You do not fix it quietly yourself.
+**ELI5.** A reviewer points at problems. A gate is a door that stays shut until they are fixed. Having a reviewer gives you no gate. And if a helper says "I'll just fix it for you," you never learn what you got wrong.
 
 ## Refactoring Splits by Whether Behaviour Has to Be Pinned First
 
-**First, the idea.** **Refactoring** (tidying the kitchen without changing the menu) comes in two sizes. They look alike but they are different jobs.
+Small-scale refactoring changes how code is laid out and leaves what it does alone. Pull a hardcoded value into configuration. Name a seam. Split a function that quietly took on a second job. It counts as correct if nothing observable moved. That makes it safe to do constantly and cheap to review, since a reviewer who trusts the claim just checks the shape.
 
-**Small-scale refactoring.** It **changes structure** and **leaves behaviour alone**. Examples:
-- **Extract a hardcoded value into configuration.**
-- Name a seam.
-- Split a function that quietly grew a second job.
+That promise is also the value. It is why the two kinds of change need separate commits. Mix both and no one can tell later which half caused a bug. The mixed commit is the anti-pattern, and rushed people write it, not careless ones. Splitting it costs one more commit and lets you revert half the work.
 
-The correctness test is that **nothing observable moved**. That is what makes this work safe to do continuously and cheap to review. A reviewer who believes that claim only has to check the shape of the change. That is the whole saving.
+Pulling out configuration is the small refactor this material asks for most. It fixes the review gap from the last section. The migration below also needs it first. A value you can change without a deploy can change one environment at a time.
 
-**Keep the two apart in history.** The claim is also the value, and it is why the two scales stay apart in the commit history. Say a **restructuring and a behaviour change** land together. The record then says **nobody can say afterwards** which half caused the symptom. The **mixed commit** is the **anti-pattern**. People in a hurry write it, not careless people. Separating it costs one **extra commit** and buys the ability to **revert half of the work**.
+Large-scale refactoring is a different job with the same name. One case keeps appearing on the exam. A deprecated parameter is used in dozens of places, with a deadline attached.
 
-**Extracting configuration.** This is the **small-scale refactor** this material asks for most. It **repairs the review defect** from the previous section, and it is a precondition for the migration in this one. A value you can **change without a deploy** is a value you can change one environment at a time.
+The deadline is real and written down. Customers with active deployments get at least sixty days' notice before a public model retires. Requests to a retired model simply fail. And an audit of API usage helps you find the places that still call the old thing.<sup>[8]</sup>
 
-**Large-scale refactoring.** This is a different activity wearing the same word. The exam reaches for one instance of it repeatedly: a **deprecated parameter**, used in **dozens of places**, with a **deadline attached**.
+The deadline is not the danger. Meaning is.
 
-**The deadline.** The deadline is real and it is documented.
-- Customers with active deployments get at least **sixty days' notice** before a **public model retires**.
-- Requests to a **retired model fail outright**.
-- An **audit of API usage** exists precisely so you can find where the deprecated thing is still called.<sup>[8]</sup>
+Two documented migrations show it. The first is manual extended thinking with an explicit token budget. The newest models do not support it and return an error. That budget has no direct replacement. Thinking is adaptive, and the effort parameter controls the output, not a thinking budget.<sup>[9]</sup> The second is the sampling parameters. They were deprecated from a stated generation onward and return an error when set to a non-default value. One SDK dropped them entirely, so passing them raises a type error, not a quiet ignore.<sup>[8]</sup>
 
-**The real risk is semantics.** The deadline is not the risk. **Semantics** (what the thing actually does) are.
+In both, the replacement is not a rename. It works on something else. So a mechanical swap across forty call sites changes behaviour at every one and warns you at none. It is like a supplier swapping your sandwich for a salad under the same item number.
 
-Two documented migrations make the point better than an abstraction does.
-- **Manual extended thinking** with an **explicit token budget** is **unsupported on the newest models** and returns an error. The budget parameter has no **direct replacement** at all. **Thinking is adaptive**, and the **effort parameter** is an **output-level control** rather than a thinking budget.<sup>[9]</sup>
-- **Sampling parameters** went the same way. They were deprecated from a stated generation onward and return an error when set to a non-default value. They were removed outright from one SDK, so passing them **raises a type error** rather than being ignored.<sup>[8]</sup>
+So the order is fixed. Lock in the behaviour first, then change it. Write regression tests for what the parameter does today, while the old one still works, since afterwards there is nothing left to observe. Then migrate in batches small enough to trace a failure to one batch. Check each batch against those tests before starting the next.
 
-In both cases the **replacement is not a rename**. It acts on a different thing. So a **mechanical substitution** across forty call sites **changes behaviour** at every one of them and tells you at none.
+Two named failures cluster here, and both answer a question nobody asked.
 
-**The order of work.** That fixes the order of work. **Pin the behaviour, then change it.**
-1. Write **regression tests** covering what the parameter currently does. Do it while the **old parameter still works**, because afterwards there is nothing left to observe.
-2. Then **migrate in batches** small enough to attribute a failure to.
-3. Validate each batch against those tests before starting the next.
+The compatibility wrapper keeps the old signature while the meaning shifts beneath it. Every call site still compiles and the diff is tiny. But the change in meaning now sits inside one function that no test watches. The parameter still vanishes on the published date.
 
-**Two named failures.** Both cluster here, and both are answers to a question **nobody asked**.
-- The **compatibility wrapper keeps the old signature alive** while the **meaning changes underneath** it. Every call site keeps compiling. The diff looks tiny. The **semantic change** has simply been moved into one function where no test is watching it. The parameter still disappears on the **published date**.
-- The **deadline-day migration** is the **honest version** of the same avoidance. Work is scheduled for the end of the window. That **concentrates every semantic change** into one **unvalidated push**, at the moment there is no **slack left** to recover in.
+The deadline-day migration is the honest form of the same dodge. All the work is booked for the last stretch. So every change in meaning lands in one unchecked push, when no time is left to recover.
 
-Both **trade a real risk** for a schedule that feels tidier.
+Both trade a real risk for a tidier calendar.
 
-**ELI5.** Moving a shelf is easy to check, because the food is still the same. Swapping an ingredient for a different one is not. First you write down exactly how the dish tastes now. Then you change a few dishes at a time and taste each one. Waiting until the last day to change them all is how you serve something wrong.
+**ELI5.** Before swapping a part, photograph how the old one works. Change a few things at a time and compare. Doing it all on the last day leaves no time to fix mistakes.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on engineering practice are **unusually hard to eliminate**, because they describe things **competent teams** genuinely do. Wrappers get written. Deadlines get planned around. Reviewers do sometimes fix small things themselves. **Four assumptions** produce most of them.
+Wrong answers here are hard to rule out, because they describe things good teams do. Wrappers get written. Reviewers do sometimes fix small things themselves. Four habits of thought produce most of them.
 
-**The four wrong assumptions:**
-- **Schedule risk substituted for semantic risk.** The option **addresses when work happens** rather than whether the **change is safe**. Examples are a **wrapper**, a **batching plan** or a **later release**. The **test is quick**. Ask whether the option would still be the **right answer** if the **deadline were a year away**. If it would, it **never addressed the risk** the **scenario described**. It becomes correct only where the replacement really is a **drop-in rename**.
-- **A check with no tolerance for rewording.** Examples are **exact string equality**, a **fixed response length** and a **stored output compared literally**. Each is a real check that **catches real changes**. Each also **fires when the answer is right** and **phrased differently**. So it **reports noise and gets disabled**, leaving the system worse covered than before it was added. Ask what a **correct-but-reworded answer** does to the check being proposed.
-- **Judgement removed** at the point where **judgement was the product**. Examples are **auto-rewriting a prompt** on a **failing score**, approving a change with a **promise to repair it privately**, and treating an **automated reviewer's presence** as a **merge gate**. Each **converts a signal meant for a human** into an **action by a machine**. Ask which human was **supposed to decide**, and whether the option leaves them anything to decide with.
-- **A partial repair accepted** because it is the largest one. **Three independent gaps** are named and the option **closes the biggest**. It is a **genuine improvement**, which is exactly why it **survives a first read**. Where each **gap fails in production** on its own, the **answer is the set**. An option **addressing two of three** is **wrong by the same rule** as one **addressing none**.
+- **Schedule risk standing in for meaning risk.** The option fixes when the work happens, not whether the change is safe. Examples are a wrapper, a batching plan or a later release. A quick test helps. Would it still be right if the deadline were a year off? If yes, it never touched the risk in the scenario. It is right only when the replacement is truly a drop-in rename.
+- A check that cannot take rewording. Exact string equality, a fixed response length, a stored output compared literally. Each catches real changes. Each also fires on a right answer phrased another way, so it makes noise and gets turned off. Ask what a correct but reworded answer does to the check.
+- Judgement taken out where judgement was the point. Examples: rewriting a prompt automatically on a low score, approving with a promise to fix it privately, and treating an automated reviewer as a merge gate. Each turns a signal for a person into an action by a machine. Ask which person was meant to decide, and whether the option leaves them anything to decide with.
+- A partial fix chosen because it is biggest. Three separate gaps are listed. The option closes the largest. It is a real gain, so it passes a first read. When each gap breaks production alone, the answer is all of them. Covering two of three is wrong by the same rule as covering none.
 
-**Match on what the scenario** is doing rather than on the technology it names.
+Match on what the scenario does, not on the tool it names.
 
-| When the scenario says | The answer is usually | The trap is usually |
+| If the scenario says | Usual answer | Usual trap |
 |---|---|---|
-| A parameter is deprecated and its replacement behaves differently | Cover current behaviour with tests, then migrate in batches you can attribute | A wrapper that keeps the call shape, or one swap at the deadline |
-| A pipeline is being designed for a Claude-backed service | Stages that catch real regressions and stay green when wording shifts | Literal output comparison, or rewriting and deploying automatically |
-| A change hardcodes configuration, skips error handling and has no tests | Request all three before merge, because each fails independently | Approving and repairing it yourself, or deferring the error path |
-| The same job has to behave identically on every machine that runs it | Load nothing the host happens to have, and state the context explicitly | Assuming a scripted run sees what a developer's session sees |
-| Prompts are edited by hand and nobody can say what changed when | One home, a tracked history, and review on the code's terms | A hand-kept change log, or review left optional for prose |
-| Volume is high, units are independent, nobody waits on any one result | Bounded concurrency with a correlation key, or asynchronous submission | Launching every call at once, or a sequential loop defended as simple |
-| A retry is firing and the same action has landed twice | Make the unit of work safe to repeat, keyed so the receiver knows it | More retries, fewer retries, or backoff, none of which change a repeat |
-| An automated reviewer already comments on every pull request | Read its findings in your own pipeline and decide what stops a merge | Treating the reviewer's presence as the gate itself |
-| A response field gains a value the code was never written for | Branch on known values and default the rest | An exhaustive switch, or matching on the error message text |
+| A parameter is deprecated and its replacement acts differently | Test current behaviour, then migrate in batches you can trace | A wrapper keeping the call shape, or a single swap on deadline day |
+| A pipeline is planned for a Claude-backed service | Stages that catch real regressions and stay green when wording shifts | Comparing output literally, or auto-rewriting and deploying |
+| A change hardcodes settings, skips error handling and has no tests | Ask for all three before merge, as each fails alone | Approving and fixing it yourself, or deferring the error path |
+| One job must act the same on every machine | Load nothing the host happens to hold, and state the context | Assuming a scripted run sees what a developer's session sees |
+| Prompts are hand-edited and nobody knows what changed when | One home, tracked history, review on the code's terms | A hand-kept log, or optional review for prose |
+| Volume is high, jobs are independent, no one waits on one result | Bounded concurrency with a correlation key, or asynchronous submission | Starting every call at once, or a plain loop called simple |
+| A retry fires and the same action landed twice | Make the job safe to repeat, with a key the receiver knows | More retries, fewer retries or backoff, none of which fix a repeat |
+| An automated reviewer already comments on every pull request | Read its findings in your pipeline and decide what blocks a merge | Treating the reviewer being there as the gate |
+| A response field gets a value the code never expected | Branch on known values and default the rest | A full switch, or matching on error message text |
 
-**A habit that works past the table.** For each option, name which of the **five properties** of a **model-shaped dependency** (the supplier) it accounts for, and which one it **quietly assumes away**. Wrong options on this material are almost always **correct engineering** aimed at a dependency that **behaves better** than this one does.
+One habit works past the table. For each option, say which of the five properties of a model-shaped dependency it covers and which it quietly ignores. Wrong options are nearly always good engineering aimed at a dependency that behaves better than this one.
 
-**ELI5.** Wrong answers are usually good kitchen habits aimed at the wrong problem. They fix the timetable when the dish is the problem. They check for exact wording when a different word is fine. They take the decision away from the chef. Or they fix one of three problems and call it done.
+**ELI5.** Wrong answers sound like things smart teams really do. Ask of each one: does it deal with the real danger, or just make the calendar look neat? Does a person still get to decide?
 
 ## What to Remember
 
-- A **model-shaped dependency has five properties**. It **varies between identical runs**, **bills by the call**, retires on the **publisher's schedule**, **fails while returning success**, and has its **behaviour defined in prose**. Ordinary engineering practice is unchanged. What changes is which **property each practice must absorb**.
-- A **contract** is what is **promised plus what is reserved**. Errors arrive as **JSON** with a **type, a message and a request identifier**. The **versioning policy reserves the right** for those value sets to **grow**. So a consumer **branches on known values and defaults the rest**, and never matches on message text.
-- An **`anthropic-version` header is required on every request**. The **latest version is recommended**, and **earlier ones are deprecated** and may be closed to new users. Pinning does not freeze the service. It makes an **upgrade a decision somebody made**.
-- **Concurrency is overlapping waiting, not parallel computation**, so one process can hold many calls in flight. The **governing limit is the one you set**. **Bounded workers** turn a burst into a rate. **Launching everything at once** meets the **rate limit as a wall** and **burns retry budget** the queued work needs.
-- A **retried call must be safe to repeat**, because concurrency makes a rare retry routine. Work that **writes, charges or sends** carries a **key the receiver recognises as already handled**. Without one, the **same record is created twice** by a correct client and a correct service.
-- **Completion order is not submission order**. Every unit of concurrent work carries a **correlation key that returns with its result**. Joining on position updates the wrong record and **raises no error** doing it.
-- Anything whose **change changes production behaviour** belongs in **version control**: **prompt text**, **model identifiers**, tool and **output schemas**, **evaluation sets** and thresholds. **Credentials** do not. Configuration is **shared by being committed**, while machine-specific settings are **deliberately excluded**.
-- A **prompt is behaviour-defining code**, meaning **two prompt versions are two systems** on the same input. It needs **one home**, a **tracked history**, and a **review gate no weaker** than the surrounding code's. A **hand-kept change log** matches reality only while somebody maintains it.
-- A **pipeline stage earns its place on two conditions**. It **catches a regression** that would otherwise ship, and its **green result survives an answer reworded** and still correct. **Literal output comparison fails the second** and gets disabled. **Automatic remediation** fails the first, deleting the signal it was meant to raise.
-- **Three stages** fit this class of system: a **scored evaluation against a versioned set** with a threshold, **contract tests** over schemas and downstream parsers, and a **token and cost regression check**.
-- A **scripted run** that loads whatever the **host has configured is not reproducible**. Non-interactive Claude Code **reads the working directory and home directory** by default, including hooks and configured servers. A **bare mode skips that discovery** so every machine produces the same result.
-- A **reviewer produces findings**. A gate **decides which findings stop a change**. The managed review posts inline comments and a **check run that always completes neutral**, so it **never blocks a merge** on its own. Gating means **reading its severity output** in your own pipeline.
-- **Three gaps in a Claude-powered change** each **fail independently**. **Configuration hardcoded** cannot change without a deploy. **No error path** turns the first rate limit into an unhandled exception. **No tests** leave both unverifiable. The answer **requests all three**, and **approving while fixing it yourself** moves the work instead of resolving it.
-- What makes a **change reviewable**: it does **one thing**, an **example shows it running**, a **test proves the behaviour**, and a **short statement names what it assumes** about its environment. A reviewer forced to **reconstruct intent** reviews last.
-- **Restructuring and behaviour change belong in separate commits**. Landed together, they leave a **history nobody can attribute** a symptom to. Separating them costs one **extra commit**.
-- **Small refactoring changes structure** and nothing observable. **Large refactoring changes semantics**, which is why **behaviour is pinned in tests** before it is changed and migrated in **batches small enough to attribute** a failure to.
-- A **deprecated parameter whose replacement acts on something else** is not a rename. Anthropic gives at least **sixty days' notice** before a public model retires, **requests past retirement fail**, and a **usage audit locates remaining call sites**. A **compatibility wrapper keeps the signature** and **loses the semantics**. The **deadline-day migration** concentrates every semantic change into one push with no slack behind it.
+- A model-shaped dependency has five properties: it varies between identical runs, bills by the call, retires on the publisher's schedule, fails while returning success, and has behaviour defined in prose. Practice stays the same. Each practice must absorb a property.
+- A contract is what is promised plus what is reserved. Errors arrive as JSON with a type, a message and a request identifier. The versioning policy reserves the right to grow those value sets. So code branches on known values, defaults the rest, and skips message text.
+- Every request needs an `anthropic-version` header. The latest version is recommended. Earlier ones are deprecated and may be closed to new users. Pinning makes any upgrade a deliberate decision.
+- Concurrency means overlapping waiting, not parallel computation, so one process can hold many calls in flight. You set the limit that governs. Bounded workers turn a burst into a rate. Launching everything hits the rate limit as a wall and burns retry budget queued work needs.
+- A retried call must be safe to repeat, since concurrency makes rare retries routine. Work that writes, charges or sends carries a key the receiver knows it already handled. Otherwise a correct client and a correct service create the record twice.
+- Completion order is not submission order. Each unit of concurrent work carries a correlation key that returns with its result. Joining by position updates the wrong record silently.
+- Anything that changes production behaviour when edited belongs in version control: prompt text, model identifiers, tool and output schemas, evaluation sets and thresholds. Credentials do not. Shared configuration is committed. Machine-specific settings are left out.
+- A prompt is code that defines behaviour, so two prompt versions are two systems on one input. It needs one home, a tracked history, and a review gate as strict as the code around it. A hand-kept change log drifts from reality.
+- A pipeline stage earns its place by two tests. It catches a regression that would otherwise ship, and its green result survives an answer that is reworded but correct. Literal output comparison fails the second and gets disabled. Automatic remediation fails the first and deletes the signal it was meant to raise.
+- Three stages fit: a scored evaluation against a versioned set with a threshold, contract tests over schemas and downstream parsers, and a token and cost regression check.
+- A scripted run that loads whatever the host has configured is not reproducible. Non-interactive Claude Code reads the working directory and home directory by default, including hooks and configured servers. A bare mode skips that, so every machine gives the same result.
+- A reviewer produces findings. A gate decides which findings stop a change. The managed review posts inline comments and a check run that always ends neutral, so it never blocks a merge itself. Gating means reading its severity output yourself.
+- Three gaps in a Claude-powered change each fail alone. Hardcoded configuration cannot change without a deploy. No error path turns the first rate limit into an unhandled exception. No tests leave both unproven. Ask for all three. Approving while fixing it yourself moves the work instead of resolving it.
+- A change is easy to review when it does one thing, an example shows it running, a test proves the behaviour, and a short note states what it assumes about its environment. A reviewer who must rebuild the intent reviews last.
+- Restructuring and behaviour change go in separate commits. Together, no one can say which caused a symptom. Splitting costs one extra commit.
+- Small refactoring changes structure and nothing observable. Large refactoring changes semantics, so behaviour is pinned in tests before the change, and migration runs in batches small enough to trace a failure.
+- A deprecated parameter whose replacement acts on something else is not a rename. Anthropic gives at least sixty days' notice before a public model retires, requests past retirement fail, and a usage audit finds remaining call sites. A compatibility wrapper keeps the signature and loses the meaning. The deadline-day migration packs every semantic change into one push with no slack behind it.
 
-**ELI5.** Your kitchen buys from a far-away supplier who charges per delivery, changes the catalogue on their own timetable, and sometimes sends the wrong box with a happy note. So you keep every recipe in the recipe book, send only a few orders at a time, and check each dish in a way that does not mind small wording changes. A chef makes the final call, and when the supplier swaps an ingredient, you taste before and after.
+**ELI5.** Treat the model like a moody supplier across town. Expect surprises, limit your calls, keep your recipes in one tracked place, check deliveries for sense and not spelling, and test before you switch.
 
 ## Endnotes for this chapter
 

@@ -1,177 +1,124 @@
 # Chapter 10: One Server, Many Clients, Transport by Locality
 
-**Summary**: *One capability, four teams, and a vendor interface that changes when it likes. Wire that integration into each application and the same repair happens four times, late, in four codebases. A server (the shared shop) is the alternative: one implementation, several callers, released on a schedule of its own. This chapter covers four things. First, what a server exposes and who decides to use each part. Second, why transport (how the two sides talk) is settled by where the server runs. Third, which configuration scope shares a server and which keeps it private. Fourth, what changes when callers differ in privilege.*
+**Summary**: *Four teams need one capability, and the vendor's interface keeps changing. If each team builds its own link, every change costs four fixes in four repos. A server is built once, called by several apps, and released on its own timeline. This chapter covers what a server offers, why its location picks the transport, which scope shares it, and what changes when callers differ in privilege.*
 
 ## Four Applications, One Interface, and Four Copies of Every Breaking Change
 
-**First, the idea.** When several applications need the same capability, you can build it once in a shared place instead of four times. Think of a **shop**. The shop is the **server** (a separately running process). Each application is a branch that sends someone to the shop's counter. That someone is the **client** (the part of an application that connects to a server).
+An internal **analytics platform** has four users: a support assistant, a reporting agent, a developer tool and a contractor's tool. Each writes its own schema, login and error handling.
 
-**The problem.** Take an internal **analytics platform**. **Four applications** want to use it: a support assistant, a reporting agent, a developer tool, and something an external contractor uses. Each team **writes its own** schema, its own authentication and its own error handling. That is **four descriptions of one operation**. It is like four branches each building their own copy of the shop's service.
+Then the platform makes a **breaking change**. Each team finds out separately and patches alone.
 
-Then the platform ships a **breaking change** on a **release schedule** none of the four controls. That means **four repairs**, found at four different times.
+Our analogy is a factory tool room. One room stores the drill and teams borrow it. The room is the server. The teams are the clients.
 
-**The fix.** That is the argument for a server. It is about **reuse rather than capability**. **Model Context Protocol** (MCP, the shared rulebook for how clients and servers talk) lifts the **tool definition** out of any single application. It puts it in a **separately running process** (the shop) that clients connect to.<sup>[1]</sup> **Build the operation once**. Every client you connect gets it.
+A server is about reuse, not extra power. **Model Context Protocol** (MCP) lifts the tool definition out of one app. It lives in its own running process, and clients connect to it.<sup>[1]</sup> Build the operation once and each client gets it.
 
-**Where is the line?** The point where this starts to pay off has a name. The **reuse boundary** is where a capability **stops belonging** to one application and becomes a **separately released artifact** (a shop with its own opening hours) that several applications call. Two facts push a capability over it:
-- **more than one consumer** (more than one branch)
-- an interface that **moves independently** of all of them
+The **reuse boundary** is where a capability stops being one app's code and is released separately. Two facts carry it across: more than one consumer, and an interface that changes independently. With one consumer and a steady interface, a directly wired tool costs less. Chapter 11 covers that choice.
 
-With one consumer and a stable interface, the tool you wire directly **stays cheaper**. That is like a branch making the thing in its own back room. Chapter 11 covers that choice.
-
-**ELI5.** Four shops each wanted the same machine. Instead of building four machines, you build one machine in a shared building. When it breaks or gets an upgrade, you fix it once. But if only one shop wants it, just keep it in that shop.
+**ELI5.** Four kids each buy scissors, then the design changes. All four must repair theirs. One shared pair is fixed once.
 
 ## Three Primitives, Separated by Who Decides to Use Them
 
-**First, the idea.** A server can offer three kinds of things. They are called **primitives**. What separates them is not what they hold. It is **who decides to use them**.
-
-A server **exposes tools, resources and prompts**. Accounts of them describe what each contains, which is the least useful thing about them. What decides which you reach for is **who initiates** (who starts the request).
-
-In the shop, the three look like this:
-- a **tool** is a service the shop does when someone asks, such as "run this report"
-- a **resource** is a good on the shelf. The branch manager (the **host**, the application that runs the client) picks it up and puts it on the desk before work starts
-- a **prompt** is a printed order form that a customer (a **person**) picks on purpose
+A server offers **tools, resources and prompts**. Who starts each one tells them apart.
 
 | Primitive | Who initiates | What it holds | Reach for it when |
 |---|---|---|---|
-| Tool | The model, from the request and its context | An action with a schema, invoked, returning a result | The operation has to be chosen at runtime by whatever the work needs |
-| Resource | The host application, which assembles context | Read-only data addressed by a URI | Known data belongs in context from the start of the turn |
-| Prompt | A person, selecting it deliberately | A vetted instruction template, usually surfaced as a command | Exact wording beats whatever a human would type |
+| Tool | The model, judging from the request | A callable action that returns a result | The job picks the operation at runtime |
+| Resource | The host application, building the context | Data to read, found by a URI | The data is known and needed at turn start |
+| Prompt | A person, choosing on purpose | A tested instruction template, often a command | Exact wording matters more than a human's typing |
 
-**In plain words:**
-- Tools are **model-controlled**. The model invokes them on its **own reading** of the situation.<sup>[2]</sup>
-- Resources are **application-driven**. The **host decides** how to bring them in.<sup>[3]</sup>
-- Prompts are **user-controlled**. They are exposed so **somebody selects** one explicitly.<sup>[4]</sup>
+In the tool room, a tool is a drill the worker (the model) grabs mid-job. A resource is a binder the foreman (the host) hands over at shift start. A prompt is a work order a person takes off the rack.
 
-**What a wrong choice costs.** Each **wrong choice costs** something specific.
-- **Data published** as a tool spends a **round trip** (a trip to the shop and back) fetching what was never in doubt.
-- **Wording published** as a tool leaves the **model deciding** whether to apply the phrasing. That phrasing was the whole point of packaging it.
+Tools are **model-controlled**.<sup>[2]</sup> Resources are **application-driven**: the host chooses how they arrive.<sup>[3]</sup> Prompts are **user-controlled**: somebody selects one.<sup>[4]</sup>
 
-**ELI5.** The shop has three kinds of things. Some are services Claude asks for when it needs them. Some are goods on a shelf that the manager hands over at the start. Some are order forms a person picks on purpose. Who picks tells you which kind it is.
+Wrong picks cost something. Data offered as a tool burns a round trip on something never in doubt. Wording offered as a tool lets the model decide whether to use it at all.
+
+**ELI5.** Some things you grab, some a helper hands you, some you pick from a menu. Who picks tells you the kind.
 
 ## Transport Is Decided by Where the Server Runs, Not by Preference
 
-**First, the idea.** **Transport** is the way the client and the server send messages to each other. The protocol offers two, and you choose by **where the server runs** compared with the client.
+The protocol defines two standard **transports**, meaning ways to carry messages.<sup>[5]</sup> With **stdio**, the client launches the server as a child process. They swap JSON-RPC messages over its standard input and output, one per line. Logs go to standard error. Standard output holds only valid messages. **Streamable HTTP** uses one endpoint path for both POST and GET.
 
-**The two standard transports.**<sup>[5]</sup> In shop terms, one is a walkie-talkie between two people in the same room. The other is a phone line to a shop across town.
-- **stdio** (the walkie-talkie). The client starts the server as a **child process** (a program it launches itself). The two speak over that process's own **standard input and output**. It uses one JSON-RPC **message per line**. Standard error is free for logging. Nothing but valid messages is allowed on standard output.
-- **Streamable HTTP** (the phone line). The server gives one endpoint path that answers both **POST and GET**.
+Choose by where the server sits relative to its client. A child process already has pipes, like a hatch between two rooms. A shared deployment on a machine no user owns needs a network protocol, like the post between buildings.
 
-**The rule: process locality decides.** The fact you need is where your **server runs** relative to its client. A child process already has its **pipes** (the walkie-talkie is built in). A deployment **shared by many users**, on a machine none of them own, is what a **network protocol** is for.
+Two tidy habits fail. A port on every workstation gives a local tool a network surface it never needed. A subprocess per user of a shared deployment grows with users and drops the single deployment you wanted.
 
-**Two anti-patterns.** Both sound like consistency.
-- A **listening port on every workstation** gives a purely local tool a network surface nobody needed.
-- A **subprocess per user of a shared deployment** fails the other way. It **multiplies server processes** with users. It gives up the single deployment that was the reason to build a server.
+The choice is per deployment. One server can use pipes on a laptop and HTTP when shared. A third option drops the process boundary: the server sits in your own app, in-process.<sup>[6]</sup> Config reflects this. An entry holding a command defaults to stdio. An entry holding a `url` must state its type: `http`, `sse` or `ws`.<sup>[7]</sup>
 
-**Transport is chosen per deployment.** The protocol does not fix it. So one server can run over pipes locally and be **hosted over HTTP** for the shared case. A third shape **skips the process boundary**. The server is defined in your own application code and runs in-process.<sup>[6]</sup>
-
-**How configuration shows it.** Configuration follows the same fact:
-- An entry **carrying a command** is **stdio by default**.
-- An entry carrying a `url` needs an **explicit type** of `http`, `sse` or `ws`.<sup>[7]</sup>
-
-**ELI5.** If the helper sits in the same room, you can just talk through a tube. If the helper works across town for lots of people, you need a phone line. Look at where the helper is, then pick. Do not pick the same one for everything.
+**ELI5.** A friend next door gets notes through a hatch. A friend across town gets a letter. Where they live picks the method.
 
 ## The Host Owns the Client, and a Server Never Sees the Whole Conversation
 
-**First, the idea.** MCP splits the work into three parts: **host, client, server**. In the shop, the branch manager is the host. The person sent to the counter is the client. The shop is the server.
+Roles: host, client, server. The host app makes the clients. Each client speaks to exactly one server. The host keeps the walls up.<sup>[1]</sup>
 
-**How the parts fit.**<sup>[1]</sup>
-- The **host** application creates and manages client instances.
-- Each **client** talks to **exactly one server**.
-- The host **enforces the boundaries** between them.
+Picture the factory office sending one runner per tool room. Like a server, a runner knows nothing about other rooms. It cannot read the conversation history or look into a neighbour. So it can never lean on context it was not handed. That isolation lets servers combine.
 
-**What this means for you as a server author.** Three consequences bind an author. A server:
-- receives only what is sent to it
-- **cannot read the conversation history**
-- **cannot see into another server**
+You build the server, rarely the client. Claude Code ships one. The **MCP connector** also reaches a remote server straight from the Messages API, with no client process.<sup>[8]</sup>
 
-So nothing the server does may depend on context it was not passed. The composability that lets several servers combine comes out of that **isolation**. It is like the shop only knowing what the person at the counter tells it.
-
-**Who writes what.** You **write the server**. You **rarely write the client**. Claude Code ships one. The **MCP connector** reaches a remote server straight from the Messages API with no separate client process.<sup>[8]</sup>
-
-**ELI5.** The manager sends one person to each shop. The shop only knows what that person says. It cannot read the manager's notes or peek into the shop next door. So always tell the shop everything it needs.
+**ELI5.** A runner fetches from one room and knows only what the slip says.
 
 ## Configuration Scope Answers Who Loads the Server, Never What It Does
 
-**First, the idea.** A **scope** says who gets a server's setup. It never changes what the server does. In shop terms, it is the list of branches that have the shop's phone number.
-
-**The scopes.** Claude Code writes a definition at one of **three scopes**, with a fourth **deployed administratively**.<sup>[9]</sup>
+Claude Code stores a definition at one of three scopes. A fourth is rolled out by administrators.<sup>[9]</sup>
 
 | Scope | Where the definition lands | Who gets the server |
 |---|---|---|
-| `local` | `~/.claude.json`, under this project's entry. The default | One person, one project |
-| `project` | `.mcp.json` at the repository root | Everyone who clones the repository |
-| `user` | `~/.claude.json`, at the top level | One person, every project |
-| Managed | An administered file deployed to the machine | Everyone in the organisation, with no individual setup |
+| `local` | `~/.claude.json`, under this project. The default | You, this project only |
+| `project` | `.mcp.json` in the repository root | Anyone who clones the repository |
+| `user` | `~/.claude.json`, top level | You, in all projects |
+| Managed | A file admins place on the machine | The whole organisation, no individual setup |
 
-**How to choose.** **Scope follows who needs the thing**.
-- A dependency your team shares belongs in **version control** (the shared history of the code), reviewed and versioned with the code.
-- A **personal experiment** stays personal.
-- **Setup instructions in a README** is the anti-pattern that keeps winning arguments it should lose. It is unreviewable, unversioned and undistributable. It also splits apart the first time somebody reads step four differently.
+Pick by audience. A team server goes in version control, reviewed with the code. A private experiment stays private. README setup steps are the bad habit: nobody reviews them, and people read step four differently.
 
-**Four mechanics matter.**
-- **Scope is fixed** when a server is added. So changing it means **removing the entry** and adding it again.
-- Where one name is defined at more than one scope, the **highest-precedence definition** is **used whole**. There is **no merging across scopes**.<sup>[9]</sup>
-- The first time Claude Code meets a project-scoped server it **asks for approval**. So a repository you cloned cannot start a process **without consent**.<sup>[10]</sup>
-- A project-scoped stdio server runs from each **teammate's machine**. So every clone needs the **runtime installed** (the program that runs the server).
+Four details apply. Scope is locked when you add the server. To change it, delete the entry and add it again. If a name appears at several scopes, the highest-precedence definition wins whole, with no merging.<sup>[9]</sup> Claude Code asks approval the first time it sees a project-scoped server, so a cloned repo cannot launch anything unasked.<sup>[10]</sup> And a project-scoped stdio server runs on each teammate's machine, so everyone needs the runtime. Chapter 22 owns credentials. Git history keeps an inline secret after the file drops it.
 
-Chapter 22 owns credentials. One warning from it fits here: **commit history** keeps an **inline secret** long after the file stops carrying it.
-
-**ELI5.** Some phone numbers are in your own notebook. Some are on the team's shared list that everyone gets. Some are given out by the boss. The list decides who can call the shop. It does not change what the shop does.
+**ELI5.** A note on the fridge is read by the household. A note in your pocket is read by you.
 
 ## A Server Reached by Callers of Differing Privilege Is a Trust Boundary
 
-**First, the idea.** A **trust boundary** is a line where you can no longer assume the other side is friendly. Once a server is **genuinely shared**, your callers **stop being uniform**. In the shop, some customers are staff and some are outside visitors.
+On a really shared server, callers are not equal. One of our four teams is the contractors. Three decisions matter. Each has an easy alternative that works only if everyone is honest.
 
-**The problem.** One of those four teams is contractors. Three decisions survive that. Each has a comfortable alternative that holds only while **every caller is honest**.
+First, **authenticate and authorise** at the server's edge. A stated identity is a claim, not proof. The specification bans one thing outright: a server must not accept a token issued for something else. One that forwards unchecked tokens becomes a relay an attacker points at whatever it guards.<sup>[11]</sup>
 
-**1. Authenticate and authorise at the server boundary.** Work out who the caller is. Do not treat connected clients as equally privileged.
-- An **identity the caller supplies** is an **assertion** (a claim) rather than a verification (a check).
-- The specification puts the credential version as a prohibition. A **server must not accept a token** that was not issued for it. A server **forwarding unvalidated tokens** is a proxy an attacker can point at whatever sits behind it.<sup>[11]</sup>
+Second, set **tool granularity** on purpose. Narrow single-job tools can be permitted caller by caller. A thin wrapper over every endpoint cannot, and neither can one tool that runs any query. That looks flexible but is blast radius. If a tool can say anything, nothing is left to permit separately.
 
-**2. Choose tool granularity deliberately.**
-- A small set of **purpose-scoped operations** can be **authorised one at a time**, per caller.
-- A **thin passthrough to every underlying endpoint** cannot be authorised that way. Neither can one tool accepting an arbitrary query.
-- That last one reads as flexibility. It is really **blast radius** (how much damage one mistake or attacker can do). A tool able to express any statement offers nothing to authorise separately.
+Third, return errors as structured results the model can act on, with no stack traces or connection strings. Chapter 9 argued for actionable errors. Here the reader may be an outsider.
 
-**3. Return errors as structured results.** The model must be able to reason about them. They carry **no stack traces** and **no connection strings**. Chapter 9 made the general case for actionable errors. What is added here is that whoever reads this one sits **outside the team** that wrote it.
+Nobody audits this for you. Anthropic does not security-audit the servers it lists, so an organisation needing a fixed set deploys one administratively.<sup>[12]</sup>
 
-**Nobody does this for you.** **Nobody audits** any of this on an organisation's behalf. Anthropic **does not security-audit** the servers it lists. So an organisation needing a **fixed set** deploys one administratively.<sup>[12]</sup>
-
-**ELI5.** When only your friends use the shop, you can trust them. When strangers can walk in, the shop must check who each person is. It should also offer small, specific services, not "do anything you like". And if something goes wrong, it should not hand over its secrets in the error message.
+**ELI5.** The clerk checks every badge and lends only what that person may take.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers here describe **real engineering**: one transport standardised on, a server scoped to the team that asked first, a configuration **kept personal**. **Four assumptions** turn those into the **wrong answer**.
+Wrong answers sound like good engineering. Four assumptions break them.
 
-**The four wrong assumptions:**
-- **One mechanism asserted to win everywhere**. Examples are "Prefer the **network transport**", "run it locally" and "support both". A **universal preference** has **ignored** the **deployment fact** the scenario supplied.
-- A **design that holds only while callers are honest**. Examples are an **asserted identity accepted**, a **general query interface**, or internal detail in an error. The cue is any stated **difference in privilege** between consumers.
-- The **interface scoped to the first consumer**. Examples are **building against one application** and extending on request, or deploying only to **developer machines**. Both **restore the coupling** a server exists to remove.
-- **Scope chosen by convenience rather than by audience**. Examples are **personal configuration** for a shared dependency, or **manual steps** standing in for a committed file.
+- **One mechanism that wins everywhere.** "Prefer the network," "go local," "do both." It ignores the deployment facts.
+- **A design that needs honest callers.** Trusting a stated identity, a free-form query tool, internals in errors. Watch for differing privilege.
+- **An interface cut to the first consumer.** Building for one app, or shipping only to developer laptops. Both restore the coupling.
+- **Scope picked for ease.** Personal config for a shared dependency, or hand-run steps instead of a committed file.
 
 | When the scenario says | The answer is usually | The trap is usually |
 |---|---|---|
-| Several applications need one capability, released separately | One server, its interface defined independently of any consumer, hosted where all reach it | Per-application integration, or an interface built for the first consumer |
-| A server is started as a local child process on one machine | Standard input and output | A network transport, a listening port, or running both |
-| One server serves workstations and a shared hosted application | A transport per deployment: pipes locally, a network protocol for the shared case | One transport imposed on both, or a subprocess per user |
-| Data is known in advance and needed at the start of the turn | A resource, addressed and fetched into context | A tool call spent retrieving what was never in doubt |
-| Every teammate needs the same server after cloning | Project scope, committed to version control | Personal scope, or setup steps in a README |
-| Consumers include somebody outside the team | Authenticate at the boundary, scope tools narrowly, keep internals out of errors | Trusting the connection, or a general query tool called flexible |
+| Many apps need one capability shipped separately | One server, hosted where all reach it | An integration per app, or an interface shaped by the first user |
+| A server starts as a local child process | Standard input and output | A network transport, a listening port, or both |
+| One server feeds workstations and a shared hosted app | Transport per deployment: pipes locally, network when shared | One transport for both, or a subprocess per user |
+| Data is known up front, needed when the turn begins | A resource, loaded into context | A tool call fetching what was never uncertain |
+| All teammates need the same server after cloning | Project scope, committed to version control | Personal scope, or README steps |
+| Some consumers sit outside the team | Authenticate at the edge, narrow tools, no internals in errors | Trusting the connection, or a general query tool called flexible |
 
-**A habit that works past the table.** One habit transfers past the table. Name the **deployment facts** the scenario stated: **how many consumers**, **where each runs**, how their **privileges differ**. Then check whether the option in front of you used them.
+One habit outlasts the table. List the deployment facts: how many consumers, where each runs, how privileges differ. Then see which option used them.
 
-**ELI5.** Wrong answers pick one favourite way and use it everywhere, trust everyone, or build only for the first customer. Instead, read what the question tells you about who uses the shop and where. Then pick the answer that fits those facts.
+**ELI5.** A wrong answer ignores a clue in the story. Collect the clues first.
 
 ## What to Remember
 
-- A **server earns its place** on two facts: **more than one consumer**, and an **interface moving independently** of all of them. One consumer and a **stable interface** make a **directly wired tool cheaper**.
-- **Tools, resources and prompts** differ by **who initiates**. The **model invokes a tool**. The **host application places a resource** (read-only data addressed by a URI) into context. A **person selects a prompt**, a **vetted instruction template** usually surfaced as a command.
-- **Process locality decides transport**. A server started as a **child process** speaks over **standard input and output**, one JSON-RPC **message per line**. A **deployment shared** by many users needs a **network protocol**. Transport is **chosen per deployment**.
-- The **host creates one client per server** and **enforces the boundaries** between them. So a server **never reads the conversation history** and never sees into another server.
-- Configuration **scope names who loads a server**, nothing else. **`local`** is **private to one project**. **`project`** lives in a **committed `.mcp.json`** reaching everyone who clones. **`user`** is private **across every project**. Scope is **fixed at the moment** a server is added.
-- A **shared server is a trust boundary**. **Resolve the caller's identity** there, because a **supplied identity** is an assertion. **Scope tools to named operations**, because one tool expressing any query offers **nothing to authorise** separately.
+- A server pays off with several consumers and an interface that moves. Otherwise wire the tool directly.
+- The model starts a tool. The host loads a resource (read-only data with a URI). A person selects a prompt, a vetted instruction template.
+- Location decides transport. A child-process server uses standard input and output, one JSON-RPC message per line. A deployment shared by many users needs a network protocol. Pick per deployment.
+- One client per server, with walls enforced by the host. A server never reads the conversation history or sees another server.
+- Scope only says who loads a server. `local` is private to one project. `project` sits in a committed `.mcp.json` for everyone who clones. `user` is private across all projects. Scope is fixed when you add it.
+- A shared server is a trust boundary. Resolve the caller there, since a supplied identity is a claim. Scope tools to named operations, since a tool that can express any query leaves nothing separate to approve.
 
-**ELI5.** Build one shared shop only when many branches need it and it keeps changing. Pick the walkie-talkie or the phone line by where the shop is. Put the team's phone list where everyone gets it. And when strangers can call, check who they are.
+**ELI5.** Build one tool room and let everyone borrow. Hatch or post depends on where it is. Check badges at the counter.
 
 ## Endnotes for this chapter
 

@@ -1,218 +1,140 @@
 # Chapter 14: Permission Modes and Where the Human Gate Goes
 
-**Summary**: *Claude Code gets configured before it gets trusted (the contractor gets their access set up before they start). Nearly every decision on this material is made once, then inherited by everybody afterwards. This chapter covers five things. First, which permission mode fits the risk of the work. Second, which file a setting belongs in so it reaches the people who need it. Third, why a standard that must hold everywhere is declared once instead of copied into each repository. Fourth, what each core component is for. Fifth, how an unattended run gets its output shape enforced instead of politely requested. Set the scope wrong and one afternoon's convenience becomes everybody's default.*
+**Summary**: *Set Claude Code up before you trust it: most choices are made once and inherited by everyone. It covers the right permission mode for the risk, the right file for each setting, why a shared standard is declared once, what each core component does, and how an unattended run gets its output shape enforced. Wrong scope turns one afternoon's shortcut into the team default.*
 
 ## The Mode Was Widened for One Refactor and Never Narrowed Again
 
-**First, the idea.** Claude Code is like a contractor you let into your building. Before they start, you decide what they can do without asking you. That decision is made once and stays in place. If you forget about it, it keeps applying long after the job that needed it.
+Picture a key card that opens every door, made for an office move. Nobody wipes it afterwards, and it gets handed on.
 
-**The analogy for this chapter.** Claude Code is the **contractor** (the tool). The **permission mode** is the keycard the contractor carries. The **settings files** are the rule binders on the wall, kept at different levels. **`CLAUDE.md`** (the context file) is the briefing note handed over each morning. Where it fits, each part gets named in bold beside its real term.
+Approving forty file edits one by one is painful. So someone **widens the permission mode** and finishes. Fine for the rename. But it lands in the committed project settings file. Now a session meant to change one value can rewrite a package.
 
-**What happened.** A **rename across forty files** is unbearable one approval at a time. So somebody **widens the permission mode** (upgrades the keycard), finishes the rename, and moves on. That was correct for the rename. But **nobody sets it back**. The wider mode reaches the **project's settings file** (the binder on the wall), **gets committed** (the binder is copied to everyone), and a session opened to change one value now starts with the authority of a session that was going to rewrite a package.
+Call this a **standing grant**: authority given once, in a file, and inherited by every later session. Permission modes, settings files, context files and allow rules are all standing grants (the card that stays programmed). Most scenarios here pair one with work it was never sized for.
 
-**The term to know.** Call that a **standing grant**. It is **authority handed over once**, in a file, then **inherited by every later session**. Nobody asks whether the task in front of you needs it. Permission modes, settings files, context files and allow rules are all **standing grants**. Nearly every scenario in this chapter is one of them meeting work it was **never sized** for.
-
-**ELI5.** Say you give a helper a master key to move all the boxes in one day. If you forget to take the key back, they keep it for every job after that. Even a job that only needed one small door.
+**ELI5.** A key card made for one move still opens every door next month.
 
 ## Plan Mode Separates Deciding Where to Change from Changing It
 
-**First, the idea.** **Plan mode** lets Claude look around and make a plan before it is allowed to change anything. Deciding where to change something is a different job from changing it.
+Claude Code works in three phases that blend: gather context, act, verify.<sup>[1]</sup> The recommended loop puts a wall between the first two. In plan mode, Claude reads, searches and explores without touching your source. You approve a plan, then it works.<sup>[2]</sup> The wall holds: plan mode is a permission mode, so edits stay blocked until you approve.<sup>[3]</sup>
 
-**The three phases.** Claude Code works a task through **three blended phases**: gather context, act, verify.<sup>[1]</sup> The recommended loop **walls the first off** from the second. **Enter plan mode**. Claude reads, searches and explores without **touching your source** (the contractor walks the building with a clipboard, but touches nothing). You approve a plan. Then the implementation runs.<sup>[2]</sup>
+Suppose one behaviour has several entry points and your edits hit the wrong one. More reading never ends. Chasing test failures assumes tests cover every entry point, the very doubt. One module per session sees no whole. Trace the flows, compare candidate spots, then edit.
 
-**The wall is real.** It is not just advice. Plan mode is itself a permission mode (a keycard level), and **edits stay blocked** until the approval.<sup>[3]</sup>
+Be exact when gathering. For files matching a filename rule, use a path pattern. A content search finds files mentioning a word and misses those that never do.
 
-**A scenario shape.** A behaviour is **spread across several entry points**, and your earlier edits **kept landing** at the wrong one. Here is why the usual fixes fail:
-- More **reading is unbounded**. There is no point where it is done.
-- Following test failures assumes the tests cover every entry point. That coverage is the thing in doubt.
-- One module per session guarantees that nothing sees the behaviour whole.
-
-The fix is to **map the flows, compare the change points**, then edit.
-
-**Gathering rewards the same precision.** A set defined by a **filename criterion** is selected exactly by a **path pattern**. **Content search** returns whatever mentions a word. It **misses the files** that never do.
-
-**ELI5.** Before the helper starts fixing, they walk round with a clipboard and write a plan. They are not allowed to touch anything until you say yes. This stops them from fixing the wrong room.
+**ELI5.** Look around the room first. Move furniture only after your plan is approved.
 
 ## Six Permission Modes, Read by Who Decides the Actions They Do Not Cover
 
-**First, the idea.** A **permission mode** is the keycard level for a session. The useful way to read the list is to ask who is left deciding about everything the card does not open.
-
-**How to read it.** A **mode sets your session's baseline**. Read the list by who is **left holding the decision** on everything the mode does not cover. Do not read it by how much it lets through.<sup>[3]</sup>
+A **mode** is the starting level for your session. Ask who makes the call on everything the mode leaves out, not how much it allows.<sup>[3]</sup> Each mode is a key card. Who stands at the doors it does not open?
 
 | Mode | Runs with no prompt | Who decides the rest |
 |---|---|---|
-| `default`, labelled Manual | Reads | A person, at a prompt |
-| `acceptEdits` | Reads, file edits, common filesystem commands such as `mkdir` and `mv` | A person, at a prompt |
-| `plan` | Reads, plus classifier-approved commands where auto mode is available | A person, and edits wait for an approved plan |
-| `auto` | Whatever a classifier model clears | A second model, reviewing each action before it runs |
-| `dontAsk` | Only pre-approved tools | Nobody: anything that would prompt is denied |
-| `bypassPermissions` | Everything | Nobody, which is why it belongs in a container |
+| `default`, labelled Manual | Reads | You, at a prompt |
+| `acceptEdits` | Reads, edits, everyday filesystem commands like `mkdir` and `mv` | You, at a prompt |
+| `plan` | Reads, and commands a classifier approves when auto mode is available | You. Edits wait for an approved plan |
+| `auto` | What a classifier model clears | A second model, per action |
+| `dontAsk` | Only pre-approved tools | No one. Prompts become denials |
+| `bypassPermissions` | All of it | No one, so use it only in a container |
 
-**Two facts hold for every row.**
-- **Deny rules apply in every mode** (a locked door no card opens), including the one that skips checks. **Allow rules stop meaning anything** in that mode.
-- Writes to protected paths such as `.git` and `.claude` are never auto-approved outside it.<sup>[3]</sup>
+Two facts hold in every row. Deny rules work in every mode, even the one that skips checks, and allow rules mean nothing there. Outside it, writes to protected paths like `.git` and `.claude` always ask first.<sup>[3]</sup>
 
-**The anti-pattern.** A **mode widened to stop the prompting**. Prompt fatigue (being tired of being asked) is a real cost. But it is not a **risk assessment**. So size the mode to the **blast radius** (how much damage a wrong action could do). A deny rule at project or organisation scope closes what a mode leaves open.
+So the mistake is widening a mode to silence prompts. Prompt fatigue is real but is not a risk check. Fit the mode to the blast radius, the damage a wrong call can do. A deny rule at project or organisation scope closes the gaps.
 
-**ELI5.** Each keycard opens some doors without asking. For every other door, someone has to decide. It might be a person, a second checker, or nobody at all. Pick the card by how bad it would be if a door opened that should not have.
+**ELI5.** A deny rule is a lock that beats every key card.
 
 ## Configuration Scope Follows Who Has to Receive the Setting
 
-**First, the idea.** A setting can live in several files. The file it sits in decides who gets it. So first ask who needs the setting, then pick the file.
+Claude Code reads settings from four files, plus whatever an organisation deploys. Precedence runs: managed settings, command-line flags, `.claude/settings.local.json`, the committed `.claude/settings.json`, then `~/.claude/settings.json`. List keys such as `permissions.allow` add up across files rather than replacing.<sup>[4]</sup>
 
-**The files and their order.** Claude Code **reads settings from four files** plus whatever an organisation deploys, and the file a key sits in decides who gets it. **Precedence runs** in this order:
-1. managed settings
-2. command-line flags
-3. `.claude/settings.local.json`
-4. the committed `.claude/settings.json`
-5. `~/.claude/settings.json`
+Ask who needs a setting. A setting the whole project needs goes in the committed project file. It travels with the checkout, gets reviewed like code, and sits in a teammate's clone. The user file covers all your projects and reaches no one else. The local file holds your personal exceptions inside one project. Managed settings are deployed centrally, and nothing below overrides them.
 
-List keys such as `permissions.allow` **merge across files rather than replacing** each other.<sup>[4]</sup>
+Two failures have names. A team decision in an environment variable lives on one machine, with no review or history. Documentation posing as configuration, like a wiki page or pasted preamble, relies on people repeating it exactly. Nothing loads it.
 
-**Read the stack as a question about audience.** Think of rule binders at different levels:
-- **The committed project file** is the binder every worker on the project gets. A setting everyone on a project needs belongs here. It **travels with the checkout** (the copy of the project you download), it is reviewed like the code it governs, and your teammate's clone has it.
-- **The user file** is your own binder. It **covers every project** on your machine and reaches nobody else.
-- **The local file** is a **personal exception** inside one project.
-- **Managed settings** are deployed centrally (the head office binder). **Nothing below overrides** them.
-
-**Two named failures.**
-- **Environment variables carrying a team decision.** They leave the value on one machine, **unreviewed and unversioned**.
-- **Documentation offered as configuration.** That means a wiki page, or a preamble each developer pastes. It depends on humans repeating themselves exactly, and nothing loads it.
-
-**ELI5.** Rules written in the shared binder reach everyone who joins the job. Rules in your own pocket reach only you. If everyone needs the rule, it goes in the shared binder.
+**ELI5.** A rule on the shared fridge reaches everyone. One in your pocket reaches you.
 
 ## Context Files Layer Instead of Overriding, So a Standard Is Declared Once
 
-**First, the idea.** `CLAUDE.md` is the briefing note Claude gets at the start of each session. Notes from different levels stack up. None of them cancels another.
+`CLAUDE.md` holds standing instructions that load at the start of each session.<sup>[5]</sup> At project scope it is `./CLAUDE.md` or `./.claude/CLAUDE.md`. At user scope, `~/.claude/CLAUDE.md`. It can also be a managed policy file.<sup>[6]</sup> Type `/init` and Claude drafts a first version from the repository.<sup>[7]</sup>
 
-**What it is.** `CLAUDE.md` is the **persistent instruction file**, **loaded at the start** of every session.<sup>[5]</sup> It can sit in these places:
-- project scope, in `./CLAUDE.md` or `./.claude/CLAUDE.md`
-- user scope, in `~/.claude/CLAUDE.md`
-- as a managed policy file<sup>[6]</sup>
+Claude joins every file it finds, and none overrides another. They run from the broadest scope down to your working directory.<sup>[5]</sup> So state a standard needed everywhere once, at the wide scope. Each repository's file then carries only what is true there. Copy the block into every repository and the copies drift apart. Link to a central page and each repository still needs a pointer someone must open.
 
-Run `/init` and Claude **drafts you a starter** from the repository itself.<sup>[7]</sup>
+Two limits. Long files are followed worse, so stay near `200` lines. Put narrower guidance in `.claude/rules/`, where a `paths` glob loads a rule only when Claude reads a matching file. And the file is context, not enforced configuration. To block an action whatever the model decides, use a hook (chapters 13 and 21).<sup>[5]</sup>
 
-**The hierarchy.** This is what scenarios get built on. Every discovered file is **concatenated rather than overridden** (joined one after another, not swapped). They are **ordered from broadest scope down** to your working directory.<sup>[5]</sup> **Nothing displaces anything**. So you **declare a standard** that must hold everywhere once, at the **wide scope**. Then each repository's file carries what is true only of it.
-
-**What goes wrong if you copy instead.** Copy that block into every repository and there are as many **copies as repositories, drifting apart**. A **central page** still needs a pointer in each repository, and somebody has to open it.
-
-**Two limits travel with this.**
-- **Size degrades adherence** (Claude follows long files less well). So keep the file **near `200` lines**. Move narrower guidance into `.claude/rules/`, where a **`paths` glob loads a rule** only when Claude reads a matching file.
-- The file is **context rather than enforced configuration**. Blocking an action whatever the model decides is a hook. Hooks are owned by chapters 13 and 21.<sup>[5]</sup>
-
-**ELI5.** Each morning the helper reads a stack of notes. The big boss's note comes first and your team's note comes after. Nothing gets crossed out. So you write the company-wide rule once, and each team only adds its own.
+**ELI5.** A school sets big rules once. Each class adds its own sheet.
 
 ## Five Components, Separated by When They Load and Who Invokes Them
 
-**First, the idea.** Claude Code has five main parts. What tells them apart is when each one enters Claude's context (what it can see) and who triggers it.
-
 | Component | Where it lives | When it enters context |
 |---|---|---|
-| Rules | `.claude/rules/*.md` | Every session, or only when a `paths` glob matches a file being read |
-| Skills | `.claude/skills/<name>/SKILL.md`, or under `~/.claude` | Descriptions at startup, the body when Claude judges it relevant or somebody types `/name` |
-| Commands | `.claude/commands/*.md` | On invocation, by typing `/name` |
-| Subagents | `.claude/agents/*.md`, or under `~/.claude` | A separate context window, on delegation |
-| Agent memory | `~/.claude/projects/<project>/memory/` | The `MEMORY.md` index every session, capped at `200` lines or 25KB; topic files on demand |
+| Rules | `.claude/rules/*.md` | At session start, or when a `paths` glob matches a file read |
+| Skills | `.claude/skills/<name>/SKILL.md`, or under `~/.claude` | Descriptions at startup. Body when relevant or on `/name` |
+| Commands | `.claude/commands/*.md` | When invoked as `/name` |
+| Subagents | `.claude/agents/*.md`, or under `~/.claude` | Own context window, on delegation |
+| Agent memory | `~/.claude/projects/<project>/memory/` | `MEMORY.md` index each session, up to `200` lines or 25KB. Topic files on demand |
 
-**Skills are directories.** A **skill is a directory** (a recipe binder on the shelf), and that property decides a recurring scenario.<sup>[8]</sup> A procedure of **instructions plus support scripts** has somewhere to keep them. Its body **costs you no context** until it is used. Compare the same material inside a context file. It **loads every session** whether the procedure comes up or not, and the **scripts are still homeless**. Built as a library, it becomes something application code calls. But the requirement was that a session could reach it. Command files still work. **Skills are their successor**.<sup>[6]</sup>
+A skill is a directory, and that settles a common case.<sup>[8]</sup> A procedure with instructions and helper scripts fits in one, and its body costs no context until used. In a context file it loads every session, needed or not, and the scripts have no home. A library is called by application code, but the need was for a session to reach it. Command files still work, but skills replaced them.<sup>[6]</sup>
 
-**Subagents.** A **subagent** (a helper sent into another room) runs in its **own context window** with its **own tool access**. So a long exploration **returns a summary** and leaves the main conversation clean.<sup>[9]</sup>
+Subagents get their own context window and tools. A long exploration returns as a summary, so the main chat stays clean.<sup>[9]</sup> Agent memory is the reverse. Claude writes it for itself, and being machine-local it shares nothing.<sup>[5]</sup>
 
-**Agent memory.** This runs the other way. Claude writes it for itself (the contractor's own notebook). It is machine-local, so it **distributes nothing**.<sup>[5]</sup>
-
-**ELI5.** Some notes are read every morning. Some are recipe binders that only come off the shelf when needed. Some helpers work in their own room and bring back a short report. And the helper keeps a private notebook that nobody else gets a copy of.
+**ELI5.** Some tools sit on the desk. Others wait in a drawer.
 
 ## An Unattended Run Needs Its Output Shape Enforced Rather Than Requested
 
-**First, the idea.** Sometimes Claude Code runs with nobody watching, and a program reads what it says. In that case you must force the format of the answer, not ask nicely for it.
+Pass `-p` and Claude Code runs one prompt and exits, once called headless mode.<sup>[6]</sup> `--output-format` chooses plain text, structured JSON, or `stream-json`. The last is newline-delimited, and with `--verbose` and `--include-partial-messages` it emits tokens as they are generated. The key flag is `--json-schema`. Paired with JSON output, it returns the result in a `structured_output` field, matched to a schema validated at startup.<sup>[10]</sup>
 
-**How an unattended run starts.** Pass `-p` and Claude Code **runs one prompt and exits**. This used to be called **headless mode**.<sup>[6]</sup> The `--output-format` flag selects one of three outputs:
-- plain text
-- structured JSON
-- `stream-json`, the newline-delimited form that **emits tokens as generated** when used with `--verbose` and `--include-partial-messages`
+A pipeline turns a review into inline comments. It needs one finding per object, with fields it can look up. Asking harder is still asking. Regexes over markdown make this week's formatting a contract. A cleanup pass adds a second unconstrained generation. Each parses prose where a contract was needed.
 
-**The decisive flag.** `--json-schema` returns the result, alongside JSON output, in a **`structured_output` field**. It is checked against a schema **validated at startup**.<sup>[10]</sup> This is the contractor filling in a form with fixed boxes, not writing a free letter.
+A `-p` run starts in Manual on every plan, so give an unattended job its mode. `dontAsk` denies anything outside the pre-approved set instead of waiting for input nobody will give.<sup>[3]</sup> Add `--bare` and Claude skips auto-discovery of hooks, skills, commands, subagents, plugins, MCP servers, memory and context files. The run then acts the same on a machine nobody configured.<sup>[10]</sup>
 
-**What this settles.** A pipeline turns a review into inline comments. It needs **one finding per object** with fields it can index. Here is why the weak options fail:
-- A **firmer instruction still only asks**.
-- **Regular expressions** over markdown encode this week's formatting as a contract.
-- A cleanup pass runs a second unconstrained generation over the first.
-
-**Prose parsed in place of a contract** is the anti-pattern.
-
-**Two mechanics finish it.**
-- A `-p` run **starts in Manual** on every plan. So you **hand an unattended job its mode**. Use `dontAsk`, which denies anything outside the **pre-approved set** instead of waiting for input nobody supplies.<sup>[3]</sup>
-- Adding `--bare` **skips auto-discovery** of hooks, skills, commands, subagents, plugins, MCP servers, memory and context files. So a run behaves the same on a **machine nobody configured**.<sup>[10]</sup>
-
-**ELI5.** If a robot reads the helper's answer, a polite request is not enough. Give the helper a form with fixed boxes and refuse any form that is filled in wrong. And since nobody is there to answer questions, tell the helper up front what it may do.
+**ELI5.** A form with labelled slots can't be filled in wrong. A schema is that form.
 
 ## The Gate Belongs Where the Worst Case Is Expensive, Not Where the Habit Is
 
-**First, the idea.** A **gate** is a point where a person must say yes. Modes and rules settle what runs unasked. The gate decides where you still have to look. Put it where a wrong call costs the most.
+Modes and rules decide what runs unasked. Where you still look depends on what a wrong call costs and how hard it is to take back.
 
-**The one input.** Modes and rules **settle what runs unasked**. They say nothing about where you still have to look. That decision has one input: what a **wrong call costs**, and how hard it is to **take back**.
+Sort actions by how they get undone. A checkpoint or diff reverses an edit inside the working directory, so a gate there is oversight nobody needed. Other actions need another action to reverse them, like a destructive shell command or a write outside the working directory. They deserve a default pause, and a deny rule makes it certain. An action nothing can reverse needs a human. The agent's own review feeds that choice, never replaces it.
 
-**Sort actions by what undoes them.**
-- An edit confined to the working directory is undone by a **checkpoint or a diff**. A gate there buys you **oversight nobody needed**.
-- An action undone only by another action gets a pause by default. Examples are a destructive shell command or a write outside the working directory. It **deserves a pause**, and a **deny rule** makes that pause deterministic (always happens, no exceptions).
-- An action nothing can take back **needs a human**. The **agent's own review** is an input, not a substitute.
+Mode and gate are one judgement at two sizes. The mode sets the session default. The gate lifts out one action.
 
-**One judgement, seen twice.** Mode and gate are one **judgement seen twice**. A mode fixes a session's default posture (the keycard). A gate **lifts one action** out of it (a manager's signature for one door).
-
-**ELI5.** Ask a person before the helper does something that cannot be undone. Don't ask about things you can easily fix, like a pencil mark you can rub out. Asking about everything just teaches people to click yes without reading.
+**ELI5.** If you can erase it, let the kid draw. If it can never be fixed, a grown-up decides.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** The wrong options here describe **configurations real teams ship**. What makes one wrong is an **assumption underneath** it. Four assumptions cover almost everything.
+Wrong options are setups real teams ship. A hidden assumption sinks each, and four cover almost all.
 
-**The four wrong assumptions:**
-- **Convenience treated as a requirement.** A **mode is picked** because it **removes interruptions**, and the **risk of the work never enters** the comparison. The option becomes correct only where the scenario calls the work **low-stakes and reversible**.
-- **State that does not travel** offered as **shared configuration**. Examples are machine-local environment variables, a pasted preamble, a wiki page, a spreadsheet. **Each holds the content**, but **none arrives with a checkout or loads** during a session.
-- **Duplication chosen over a scope that already exists.** That means a **shared standard copied into every repository**, or linked from each one. **Layering already applies** the general and the local together. So a scenario naming two scopes of instruction **wants the layering**.
-- **A shape requested where it had to be enforced.** That means **stronger wording, cleverer parsing**, or a **second generation** to tidy the first. All three leave a consumer depending on **formatting nothing promised**.
+- **Convenience treated as a requirement.** Someone picks a mode to cut interruptions and never weighs risk. Right only for work stated as low-stakes and reversible.
+- **State that does not travel**, offered as shared configuration: machine-local environment variables, a pasted preamble, a wiki page, a spreadsheet. Each holds the content. None comes with a checkout or loads in a session.
+- **Duplication chosen over a scope that already exists.** Copying a shared standard into each repository, or linking from each. Layering already combines general with local, so when a scenario names two scopes of instruction, pick layering.
+- **A shape requested where it had to be enforced.** Firmer wording, cleverer parsing, or a second pass to tidy the first. The consumer still trusts a format nobody promised.
 
-**Match** on what the **scenario** is doing. Never match on the **industry** it is **dressed** in.
+Match on what the scenario does, not its industry.
 
 | When the scenario says | The answer is usually | The trap is usually |
 |---|---|---|
-| Configuration must be identical for everyone working on a repository | The committed project settings file, versioned alongside the code | Per-machine environment variables, or a document somebody is asked to follow |
-| Standards apply everywhere, with extra rules in some repositories | Declare the general once at the wide scope and keep local files local | Copying the block into each repository, or linking out to a page |
-| A downstream program consumes the run's output | Constrain the shape at the interface and validate on receipt | A firmer instruction, a regex over markdown, or a cleanup pass |
-| Edits keep landing at the wrong place in unfamiliar code | Map the flows and compare change points before editing | More reading, test-driven iteration, or one narrow session per module |
-| A team procedure carries instructions plus support scripts | A skill directory the tool discovers and loads on demand | Inlining it into the context file, or shipping it as a library |
-| The action is hard to undo or reaches beyond the repository | A pause for a human, backed by a deny rule | A mode carried over from whatever the last task needed |
-| A job runs unattended and must behave the same on every machine | Pre-approved tools, a mode that never waits, a fixed output shape | A default that assumes somebody is at a prompt |
+| Everyone on a repository needs the same configuration | The committed project settings file, versioned with the code | Per-machine environment variables, or a document to follow |
+| Standards apply everywhere, with extras in some repositories | Declare the general part once at the wide scope. Local files stay local | Pasting the block into each repository, or linking out |
+| Another program reads the run's output | Fix the shape at the interface. Validate when it arrives | A firmer instruction, a regex over markdown, or a cleanup pass |
+| Edits land in the wrong place in unfamiliar code | Trace flows, compare change points, then edit | More reading, test-driven loops, one session per module |
+| A team procedure has instructions and scripts | A skill directory loaded when needed | Putting it in the context file, or a library |
+| An action is hard to undo or leaves the repository | A human pause, plus a deny rule | A mode inherited from the last task |
+| An unattended job must behave the same everywhere | Pre-approved tools, a mode that never waits, a fixed output shape | A default that assumes a person at a prompt |
 
-**A habit that works past the table.** One **habit transfers**. Before you compare options, ask what a fresh clone on a **machine nobody has configured** would inherit.
+One habit outlasts the table: ask what a fresh clone on an unconfigured machine would inherit.
 
-**ELI5.** Wrong answers often sound sensible. They pick the easy keycard, leave the rule in someone's pocket, copy the same note everywhere, or just ask nicely for a neat answer. Look at what the problem really is, not at the story around it.
+**ELI5.** Wrong answers feel easy. The right one works when you aren't watching.
 
 ## What to Remember
 
-- A **standing grant** is **authority set once in a file** and **inherited by every later session** without anyone re-deciding it. **Permission modes**, **settings files**, **context files** and **allow rules** all qualify. Scenarios are built on one meeting work it was **never sized** for.
-- **Six permission modes**:
-  - `default` (labelled **Manual**, reads only)
-  - `acceptEdits` (edits and **filesystem commands**)
-  - `plan` (**edits blocked** until a plan is approved)
-  - `auto` (a **classifier reviews each action**)
-  - `dontAsk` (**pre-approved tools** only, **never waits**)
-  - `bypassPermissions` (**containers only**)
+- A **standing grant** is authority written once in a file and inherited by all later sessions. Permission modes, settings files, context files and allow rules all count. Scenarios pair one with work it was never sized for.
+- Six permission modes. `default` (labelled Manual) reads only. `acceptEdits` adds edits and filesystem commands. `plan` blocks edits until a plan is approved. `auto` has a classifier review each action. `dontAsk` runs pre-approved tools only and never waits. `bypassPermissions` is for containers only. Deny rules hold in every mode. Allow rules mean nothing in the last.
+- Precedence, strongest first: managed settings, command-line flags, the project-local file, the committed project file, then user settings in your home directory. List keys such as `permissions.allow` add up across files.
+- Scope follows audience. Whatever the project needs lives in the committed project file, which is versioned, reviewed and in every fresh clone. Per-machine variables and documents reach nobody.
+- Context files are joined, broadest first, and none overrides another. Declare a cross-repository standard once at the wide scope, with each repository's file holding only its own. Copying or linking brings drift back.
+- `CLAUDE.md` is context, not enforcement, so a hard ban goes in a hook. Keep it near `200` lines. Narrow guidance goes in `.claude/rules/` with a `paths` glob.
+- Five components by load behaviour. Rules load every session or on a path match. Skills are directories, so they bundle scripts and load on demand. Commands run when typed. Subagents get their own context window and tools. Agent memory is written by Claude, stored per repository, machine-local.
+- `-p` runs one prompt and exits, the former headless mode. `stream-json` streams events. `--json-schema` returns a validated `structured_output`. Unattended pipelines enforce the shape, because asking for a format gives the flaky behaviour already reported. A `-p` run starts in Manual whatever the plan. `--bare` skips discovery of all of: hooks, skills, commands, subagents, plugins, MCP servers, memory, context files.
+- Put the human gate by reversibility. No gate where a checkpoint or a diff undoes it. A pause plus a deny rule where only another action can. A person where nothing can. The agent's own review informs the decision and never makes it.
 
-  **Deny rules hold in every mode**. **Allow rules** mean nothing in the last.
-- **Settings precedence**, highest first: **managed settings**, **command-line flags**, the **project-local file**, the **committed project file**, then **user settings** in your home directory. **List keys** such as `permissions.allow` **merge across files** rather than replacing each other.
-- **Scope follows audience**. A rule everyone on the project needs goes in the **committed project file**, which is **versioned, reviewed and present** in a **fresh clone**. **Per-machine variables and written documents** reach nobody.
-- **Context files concatenate**, **broadest scope first**, so **nothing overrides anything**. **Declare a cross-repository standard** once at the **wide scope** and let each repository's file carry only its own. Copying or linking **reintroduces drift**.
-- `CLAUDE.md` is **context, not enforcement**, so an **absolute prohibition** belongs in a **hook**. Keep it **near `200` lines** and push narrow guidance into **`.claude/rules/` with a `paths` glob**.
-- **Five components by load behaviour**:
-  - **rules** load every session or on a path match
-  - **skills** load their body on demand and **bundle scripts**, being **directories**
-  - **commands** run when typed
-  - **subagents** get their **own context window and tools**
-  - **agent memory** is **written by Claude**, stored per repository, **machine-local**
-- **`-p` runs one prompt and exits** and is the **former headless mode**. **`stream-json` streams events**. **`--json-schema` returns a validated `structured_output`**. An **unattended pipeline enforces the shape**, because **asking for a format** produces the intermittent behaviour already being reported. A **`-p` run starts in Manual** whatever the plan. **`--bare` skips discovery** of hooks, skills, commands, subagents, plugins, MCP servers, memory and context files.
-- **Place the human gate by reversibility**: **no gate** where a **checkpoint or a diff** undoes it, a **pause plus a deny rule** where only another action can, and a **person** where nothing can. The **agent's own review is an input** to that decision, never the decision.
-
-**ELI5.** Claude Code is a contractor with a keycard. Set the card once and it sticks, so size it to the job. Put shared rules in the shared binder and company rules at the top. Make robots read a fixed form. Ask a person only before things that cannot be undone.
+**ELI5.** Set rules once where everyone finds them. Lock the important ones.
 
 ## Endnotes for this chapter
 

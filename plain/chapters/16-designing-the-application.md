@@ -1,317 +1,223 @@
 # Chapter 16: Boundaries, Sessions, and Where Instructions Land
 
-**Summary**: *An application has an edge (a border) from the moment it exists. It is the place where material stops belonging to your application and starts being read by a model. If you never draw that border, it is still there, and nothing is checked at it, because every component assumed the next one was looking. This chapter draws the border five times. First, what the interface already placed in front of your instruction. Second, what may cross in either direction. Third, what shape an answer has to hold to be used. Fourth, when a conversation gets cleared. Fifth, which version of the machinery is running. Get any one of them wrong and you see the same symptom.*
+**Summary**: *Think of your application as a country with a border. At the border, your material ends and a model starts reading it. Skip the customs post and the border stays open, because every part assumes some other part is watching. This chapter builds the post five times. The five builds: what the interface told the model before your words, what may cross each way, what shape an answer needs so code can use it, when a chat gets wiped, and which tool version runs. One mistake in any gives the same symptom.*
 
 ## Every Application Has an Edge, and It Exists Before Anyone Draws It
 
-**First, the idea.** Every application has a place where its own material ends and the model's reading begins. We will call it the **edge**. Think of it as a border between two countries. The rest of this chapter keeps that picture.
+Your app is the same. A **ticket body**, a **fetched page**, a **customer record** or a **schema** goes in. Something comes out and gets acted on: a database write, a reply on screen, a call to a service that trusts what it gets.
 
-**The picture.** Your application is one country. The model is the country next door. Goods (the **material**) cross the border in both directions. The border post is the **edge**. The customs rules are the **crossing rule**. The officer who applies the rules is the **single component that decides**. Goods that get turned back are the **material that fails** the check. One honest limit on the picture: the officer is not a clever person who can be talked round. In this chapter the officer is a component, and the best kind is code that always does the same thing.
+Between those two moments is the border (the edge). Material stops being yours there and starts being read by a model. It exists from the first request. Nobody builds it. Designing it just means you can finally check it.
 
-**What crosses the border.** Something goes in. It might be a **ticket body**, a **fetched page**, a **customer record**, or a **schema** (a description of what shape the answer has to have). Something comes back out and lands somewhere that acts on it. That could be a database write, a rendered reply, or a call to a service that trusts what it was handed.
+An edge nobody drew is not missing. It is unchecked, because every part believes the check is someone else's job. Each part passed its own tests. The gap between the parts was never tested by anyone.
 
-**Where the border is.** Between those two moments there is a place where material stops belonging to the application and starts being read by a model. That place exists from the first request anybody sends. Nobody has to design it. Designing it is what makes it checkable.
+A border becomes a **crossing rule** (the customs rules) once you write down three things. What may cross. Which one component decides. What happens to goods that fail.
 
-**The problem: a border nobody drew.** An edge nobody drew is not an edge that is missing. It is an edge where nothing gets checked, because no component believes the check belongs to it. Each piece passed its own tests. The seam between them was never anybody's test.
+Without the third, you record violations but still let them through, since logging a violation is not stopping it. Without the second, two teams each build the check their own way, and the two versions drift apart. A check owned by everyone gets written by no one.
 
-**What to write down.** Three things have to be written down before an edge becomes a **crossing rule**:
-- what is **permitted to cross** (what the customs rules allow)
-- which **single component decides** (which officer stands at the post)
-- what happens to **material that fails** the decision (what happens to goods turned back)
+The blueprint lists five design areas for a Claude application. They all ask one question about different traffic.
 
-Here is what goes wrong if you skip one:
-- Drop the third and the arrangement still reports honestly and still lets everything through. That is because logging a violation and stopping one are different features.
-- Drop the second and the check gets implemented twice, differently, and the two copies drift. No human owns a shared check, so nobody writes one.
-
-**Five design areas.** The blueprint (the exam outline) names **five design areas** for a Claude application. All five are the same question aimed at different traffic.
-
-| Design area | What it settles about the edge |
+| Design area | What it decides about the edge |
 |---|---|
-| Interface | What already sits inside the boundary before your instruction arrives |
-| Content boundaries | What is allowed to cross, inbound and outbound, and who checks |
-| Schema | The shape material has to hold to cross outward and be consumed |
-| Session hygiene | When everything inside the boundary is cleared, and on what trigger |
-| Plugin management | Which version of the machinery around the edge is currently running |
+| Interface | What the model has already been told before your instruction shows up |
+| Content boundaries | What gets in or out, and who checks it |
+| Schema | The form an answer must take so it can be consumed |
+| Session hygiene | When the inside gets wiped, and what sets that off |
+| Plugin management | Which build of the tools around the edge is live |
 
-Read that table as one subject, not five. A defect in any row shows up as the same symptom. Material crossed, and nothing stopped it.
+A flaw in any row looks the same: something got across and nothing stopped it.
 
-**ELI5.** Every app has a border where its own stuff meets the model. If nobody guards the border, everybody thinks someone else is guarding it. So you write down what may cross, who checks, and what happens to things that fail.
+**ELI5.** Every house has a front door, even before you buy a lock. Someone must decide who comes in and who looks. If nobody decides, anyone walks in.
 
 ## The Same Instruction Arrives Into a Different Standing Context on Every Interface
 
-**First, the idea.** The same sentence of guidance can behave differently depending on how you send it. That happens because each **interface** (API, SDK, terminal and so on) has already put different things in front of the model. In our picture, each interface is a different border post. Each one already has its own pile of papers waiting on the other side before your goods arrive.
+Say you write one line of guidance. You send it through the API. Then through the SDK. Then you type it in the terminal. The behaviour can differ all three times, and nothing is broken.
 
-**The problem.** Write one sentence of guidance. Send it through the API. Send the identical sentence through the SDK, then type it into the terminal. Three different behaviours are a normal outcome. No interface is broken.
+Your line is never the full instruction. It lands after whatever the interface already supplied, and that amount varies a lot. Your line is the last item in a bag someone else packed (the standing context).
 
-**Why.** Your sentence is never the whole instruction. It joins whatever the surface already put in front of the model. The surfaces differ a lot in how much that is. Your text is the last layer.
+The Messages API supplies nothing. It is **stateless**. Every request has to carry the whole conversation, so anything you leave out is gone.<sup>[1]</sup> No project file loads. No saved preference lasts. Only your code remembers.
 
-**The Messages API supplies nothing.** The **Messages API** is **stateless** (it remembers nothing between requests). So every request carries the full conversational history explicitly. Anything not written into that request is absent.<sup>[1]</sup> No project file loads. No standing preference persists. Your code is the only thing that remembers anything.
+The SDK is where people trip. If you set no system prompt, it runs a small default that handles tool calling. That default has no Claude Code coding guidelines, no response style and no project context. Choose the `claude_code` preset and the model gets the CLI's full prompt: tool usage instructions, code style and formatting rules, tone and verbosity, security instructions, and working-directory context. Headless CLI runs use that full prompt automatically. That is why an instruction can act one way under `claude -p` and another way in a bare SDK call.<sup>[2]</sup> Same words, different standing prompt, no error.
 
-**The SDK is where the surprise usually lands.**
-- With **no system prompt configured**, the SDK runs a **minimal default**. It covers tool calling. It leaves out Claude Code's coding guidelines, its response style and its project context.
-- Ask for the **`claude_code` preset** instead and the model receives the full prompt the CLI uses. That means tool usage instructions, code style and formatting rules, tone and verbosity, security instructions, and context about the working directory.
-- **Headless CLI runs** use that full prompt by default. That is exactly why an instruction that behaved one way under `claude -p` behaves another way under a bare SDK call.<sup>[2]</sup>
+Project context comes by a different route. `CLAUDE.md` goes into the conversation as project context, not into the system prompt. It therefore sits alongside whichever prompt you picked, and the configured setting sources decide whether it loads, not the preset.<sup>[2]</sup> That is two separate switches. If you assume one drives the other, half your deployments will be wrong. Set both deliberately.
 
-Same words, different standing prompt, and no error anywhere.
+Interactive tools also hold their own history. The CLI, the desktop app, the web version and the editor extension keep separate session stores.<sup>[3]</sup> So there is no single "conversation" you carry from window to window. Each window has its own and none syncs.
 
-**Project context arrives on a separate track.** `CLAUDE.md` is injected into the conversation as project context. It is not put into the **system prompt**. So it works together with whichever prompt was chosen. It loads according to the configured **setting sources**, not according to the preset.<sup>[2]</sup> That makes two independent switches. A design that assumes one implies the other will be wrong on half its deployments. Set both on purpose.
-
-**Interactive surfaces keep their own histories.** The CLI, the desktop app, the web version and the editor extension each keep a **separate session store**.<sup>[3]</sup> "The conversation" is not one object that the user moves between windows. Each window keeps its own, and none of them syncs.
-
-| Surface | What is already in context before your text | Who holds the history |
+| Surface | Already in context when your text arrives | Where the history lives |
 |---|---|---|
-| Messages API | Only what the request contains | Your application, entirely |
-| Agent SDK, unconfigured | A minimal prompt covering tool calling | The SDK, per session ID |
-| Agent SDK with the coding preset | Full coding guidance, style, safety, working directory | The SDK, per session ID |
-| Headless CLI | The same full prompt, by default | Local transcript files |
-| Interactive surfaces | That surface's own configuration and project files | That surface, separately from the others |
+| Messages API | Whatever the request itself holds | Entirely in your application |
+| Agent SDK, no configuration | A small tool-calling prompt | In the SDK, keyed by session ID |
+| Agent SDK, coding preset | Complete coding guidance, style, safety and working directory | In the SDK, keyed by session ID |
+| Headless CLI | Same complete prompt, automatically | In local transcript files |
+| Interactive surfaces | The surface's own settings plus project files | In that surface, not shared |
 
-**What to do.** The design consequence is narrower than "test on every interface", which is advice nobody can act on. A rule your application depends on has to be stated where the interface will actually read it, and the interfaces read different places. For example:
-- A constraint that lives in a project file is invisible to an API integration that never loads project files.
-- A constraint written into a system prompt string is absent from a terminal session that uses the preset.
+"Test on every interface" is not something anyone can act on. Instead, put each rule where its interface reads. An API integration never loads project files, so it cannot see a rule kept in one. A terminal session on the preset never sees a rule kept only in a system prompt string. So state the rule once per channel, on purpose, as part of the application and not of one developer's machine.
 
-So behaviour that is meant to hold everywhere gets stated once per channel, on purpose. That statement is part of the application. It is not part of somebody's local setup.
+Anthropic has a test for when to write a custom prompt, and it works as a design question because it is about the product. The less your agent resembles a coding assistant in a repository with a person watching, the more of the standing prompt you write yourself. Four signs. Output that is not read in a terminal. An identity that should not look like a coding tool. A permission setup where nobody approves each step. Work that is not coding, where coding guidance fights your instructions.<sup>[2]</sup>
 
-**When to write your own prompt.** Anthropic has its own test for whether a custom prompt is warranted. It is worth borrowing as a design question, because it is about the product, not the prose. The further your agent sits from a coding assistant working in a repository with a human watching and steering, the more of the standing prompt you should write yourself. Four signs:
-- a **different surface**, where output is not read in a terminal
-- a **different identity**, which should not present as a coding tool
-- a **different permission model**, where nobody approves each step
-- work that is **not coding at all**, where coding guidance competes with the instructions you need<sup>[2]</sup>
+The anti-pattern is inheriting an instruction by accident. A developer prototypes on the preset and likes the result. They ship an integration with its own prompt. Much of what they liked came from the preset, and it is gone. Users complain about quality, but no error appears, so the cause is hard to find.
 
-**The anti-pattern: the instruction inherited by accident.** Somebody prototypes against the preset and likes the behaviour. Then they ship an integration that supplies its own prompt. Half the behaviour they liked came from the preset and is now gone. The symptom is a quality complaint, not an error. Nobody removed anything on purpose, which is why the loss is hard to trace.
-
-**ELI5.** Each way of talking to Claude has already put a different pile of papers in front of it before your note arrives. So the same note can get a different answer. Write down the rules you need in every place Claude will look.
+**ELI5.** You hand a note to different friends. One already knows the game, another knows nothing. The same note means different things. So write the key rule where each friend will look.
 
 ## Context Shapes a Decision; Only a Deterministic Gate Removes One
 
-**First, the idea.** Words you put in front of the model can nudge what it does. Only code that runs before an action can stop the action. In our picture, a notice pinned up at the border asks goods to behave. A barrier that physically will not lift is different.
+Claude Code has two memory systems: files you write and notes it builds up. Both load when a conversation starts. Both are read as context, not applied as enforced settings. To stop an action whatever the model decides, the documentation points you to a hook that runs before the tool.<sup>[4]</sup>
 
-**Memory is read as context.** Both of Claude Code's **memory systems** load at the start of every conversation. One is the files you write. The other is the notes it builds up. Both are read as context, not as enforced configuration. To block an action regardless of what the model decides, the documentation points at a **pre-tool hook** instead.<sup>[4]</sup>
+This holds well beyond one product. Words that reach the model can sway a choice. Code that runs first takes the choice away. The first kind works by probability. The second either runs or it does not. Only the second binds. A "slow down" sign at the border post asks nicely. A barrier arm (a hook) stops the car.
 
-**The general rule.** That distinction applies well beyond any one product.
-- Text that reaches the model **influences a decision**.
-- Code that runs before the action **removes the decision**.
-- Everything on the first side works in degrees. It is probabilistic. Everything on the second side either runs or does not.
+So a crossing rule that lives only as a sentence in a prompt is a preference the model usually follows. Keep it there, since a model that knows the policy behaves better. It just cannot be the only copy. The exam leans on this: an option that makes an instruction more likely to be followed does not guarantee anything.
 
-Only one of them binds.
+Better adherence is still worth the effort. Short, specific instructions get followed more reliably. The advice is plain: keep a project instruction file under about `200` lines, because a longer one eats more context and lowers adherence.<sup>[4]</sup> Concrete rules help too. "Handlers live in this directory" can be checked by a person reading the output. "Keep things tidy" cannot.
 
-**What this means for a crossing rule.** A crossing rule written only as a sentence in a prompt is a **preference with good adherence** (the model usually follows it). It belongs in the prompt as well, because a model told what the policy is behaves better than one left to guess. But it cannot be the only place. The exam tests exactly this. An option that improves how reliably an instruction is followed is not an option that guarantees anything.
-
-**Adherence is still worth working on.**
-- Specific, concise, well-structured instructions are followed more consistently than long ones.
-- The documented sizing guidance is blunt. Keep a project instruction file under about **200 lines**, because a longer file uses more context and reduces adherence.<sup>[4]</sup>
-- Concreteness is the other half. A rule stating which directory handlers live in is checkable by a human reading the output. A rule saying to keep files organised is not.
-
-**ELI5.** A sign on the wall asking people to behave works most of the time. A locked door works every time. If something must never happen, use the locked door. Use the sign as well, because it helps.
+**ELI5.** Asking a puppy nicely not to chew shoes helps a little. Shutting the shoes in a cupboard works every time. A prompt asks. A hook or check is the cupboard.
 
 ## Content Boundaries Run in Two Directions, and the Outbound One Gets Forgotten
 
-**First, the idea.** Content can cross the border coming in, and it can cross going out. Everybody designs for coming in. Going out is where reviews fail.
+Inbound is the side people design. Untrusted material reaching the model has known handling. Deliver outside content inside `tool_result` blocks, not in system prompts or plain user text. Use the tool description to say what the content is and where it came from. Tell the model in the system prompt that tool and document content is data and never overrides instructions. Wrap outside strings in JSON so an attacker cannot close a delimiter and carry on as if giving orders.<sup>[5]</sup>
 
-**Inbound: untrusted material reaching the model.** This is a documented threat with documented handling. The steps are:
-- Deliver **third-party content** inside **`tool_result` blocks**. Do not put it in system prompts or plain user text.
-- Say in the **tool description** what the content is and where it came from.
-- State in the system prompt that tool and document content is data that **never overrides instructions**.
-- **Wrap third-party strings in JSON**, so an attacker cannot close a delimiter (the marker that ends a piece of text) and carry on as an instruction.<sup>[5]</sup>
+Chapter 5 covers where those blocks go in a prompt, and chapter 20 covers the attack. What matters here is placement as a design limit. The channel that content arrives on decides how much authority it has. If a component pastes fetched text into the standing instruction, it has promoted that text, whatever the author meant. It is a parcel pinning on a customs officer's badge.
 
-Chapter 5 covers where those blocks sit in a prompt. Chapter 20 covers the attack itself. What matters here is the placement rule read as a design constraint, not as a security tip. The channel a piece of content arrives on is what sets its authority. So a component that joins fetched text onto a standing instruction has promoted it, whatever anybody intended.
+Two further inbound rules are easy to get backwards. First, keep your own instructions out of tool results. Content there counts as untrusted, so guidance in a result might be ignored or flagged. Put it in the user turn after the result.<sup>[5]</sup> Second, screen tool output the same way you screen user input. Run a small classifier call over what the tool returned. Make it give a verdict the app can parse and branch on. Do it before the content goes back as a result. Screen both directions, because only one looks dangerous.<sup>[5]</sup>
 
-**Two more inbound rules, easy to get backwards.**
-- Your own **instructions do not belong in tool results**. Content there is treated as untrusted, so guidance placed in a result may be ignored or flagged. Send it in the **user turn that follows** the result instead.<sup>[5]</sup>
-- **Screening runs on tool output** as well as on user input. That means a **small classifier call** (a quick extra check by a model) over what the tool returned. It gives a **parseable verdict** that the application branches on. This happens before the content is handed back as a result at all. Screen both directions, because only one of them looks dangerous.<sup>[5]</sup>
+Outbound is where designs fail review. Material sent to the model leaves its perimeter. What the other side does with it is a design input, not a purchasing detail. Ask before you build.
 
-**Outbound: material leaving your perimeter.** Outbound is the direction that fails a review. Material crossing to the model leaves whatever perimeter it was sitting in. The properties of the receiving side are a design input, not a purchasing detail. Ask before you build.
-
-| Outbound question | What settles it | What it constrains |
+| Question about data leaving | What answers it | What it limits |
 |---|---|---|
-| Is anything kept after the response returns | A zero-retention arrangement, enabled per organisation | Whether prompts and responses persist at rest at all<sup>[6]</sup> |
-| Is health information in scope | A signed agreement and a readiness-enabled organisation | Which features may carry it, and what safeguards apply<sup>[6]</sup> |
-| Where does inference physically run | A per-request geography parameter, or a workspace default | Which regions may serve the request, at a stated price multiplier<sup>[7]</sup> |
-| Where is the workspace itself | Chosen at creation and not changeable afterwards | A decision you make once, before there is an application<sup>[7]</sup> |
+| Is anything stored once the reply comes back? | Zero retention, switched on for each organisation | Whether prompts and replies sit in storage at all<sup>[6]</sup> |
+| Is health data involved? | A signed agreement, plus an organisation set up for it | Which features may carry the data, and which safeguards apply<sup>[6]</sup> |
+| Where does the model actually run? | A geography parameter on each request, or a workspace default | Which regions may serve the request, with a stated price multiplier<sup>[7]</sup> |
+| Where does the workspace live? | Chosen at creation, and fixed afterwards | A one-time decision made before any app exists<sup>[7]</sup> |
 
-**Two details that decide exam scenarios.**
+Two details settle exam scenarios. First, regulated content turns up in message content, in attached files, and in the file names and metadata attached to message content. Workspace names, user contact details, billing data and support tickets are not expected to hold it.<sup>[6]</sup> If your boundary guards "the prompt" but not an attachment's filename, it is in the wrong place. Metadata travels with the file, so the rule must cover it.
 
-*First: where regulated content actually turns up.* It shows up in **message content**, in **attached files**, and in **file names and metadata** tied to message content. Workspace names, user contact details, billing data and support tickets are **not expected to carry** it.<sup>[6]</sup> Suppose you draw a boundary around "the prompt" and not around the filename of the attachment. Then it is drawn in the wrong place. Metadata travels with the file, and the rule has to cover it. In our picture, it is like checking the crate but not the label stuck on the outside.
+Second, a real trap, where this chapter's two halves meet. Schemas sent for constrained output are compiled and cached apart from message content. Those cached copies do not get the protections prompts and replies get. So never put regulated content in a schema definition.<sup>[6]</sup> Field names and descriptions feel like settings, so someone eventually puts a patient identifier in an enum. Schemas are data too.
 
-*Second: a genuine trap.* It sits where this chapter's two halves meet. Schemas sent for constrained output are **compiled and cached separately** from message content. Those cached schemas do not get the same protections as prompts and responses. So **regulated content must not appear in a schema definition**.<sup>[6]</sup> Field names and descriptions feel like configuration, not data. That is why somebody eventually writes a patient identifier into an enum (a fixed list of allowed values). Schemas are data too.
+**Least privilege** works in both directions. Limit what the model can reach so a successful injection has little to use. Run tools in sandboxed environments. Keep secrets the model does not need out of reach.<sup>[5]</sup> A boundary that lets everything through still counts as a boundary. Its crossing rule just reads "anything".
 
-**Least privilege.** This is the last rule, and it applies in both directions at once.
-- **Scope what the model can reach**, so a successful injection has little to work with.
-- Run tools in **sandboxed environments**.
-- Keep secrets it does not need out of its reach entirely.<sup>[5]</sup>
-
-A boundary that permits everything through is still a boundary. It is just one where the crossing rule reads "anything".
-
-**ELI5.** Guard the border in both directions. Things coming in might be tricks. Things going out might be private. Check the crate and the label on it, and give the model only the keys it really needs.
+**ELI5.** Mail goes two ways. You check what arrives at your house, and you check what you put in the envelope you send. The name on the envelope counts too, not only the letter.
 
 ## The Schema Is a Contract With Three Parties, Not Just With the Model
 
-**First, the idea.** A **schema** looks like a formatting preference. It is really a contract. Three parties depend on it, and each one cares about different things. In our picture, a schema is a customs form that the officer, the receiving warehouse and the shipping company all have to read the same way.
+A schema on a request looks like a style note. It is a contract. The model must obey it. Downstream code is written against it. The platform compiles it into something with rules of its own.
 
-**Three parties, one document.** A schema attached to a request binds in three directions at once:
-- the **model** is constrained by it
-- **downstream code** is written against it
-- the **platform** compiles it into something with properties of its own
+The mechanism is **constrained sampling**, built from compiled grammar artifacts made from your schema.<sup>[8]</sup> Asking for a format in a prompt has no such effects. You settle them at design time.
 
-**The mechanism.** **Constrained sampling** (the model can only produce text that fits the schema) uses **compiled grammar artifacts** built from the schema.<sup>[8]</sup> That has consequences no prompt-level formatting request has. They are design consequences, not runtime ones.
+Output order is not your schema's order. Required properties come out first, in schema order, then optional ones. If a consumer needs a set order, mark everything required, or write the parser to expect shuffling.<sup>[8]</sup> A consumer that reads by position breaks the day someone makes a field optional. Read by name, never position.
 
-**Property order is not schema order.** **Required properties appear first**, in the order the schema gives them. **Optional properties follow**. If output order matters to a consumer, either mark everything required or write the parsing so reordering is expected.<sup>[8]</sup> A consumer that reads by position breaks the first time somebody makes a field optional. Read fields by name, never by position.
+Capital letters in enum values are not guaranteed. The reply completes normally, with no error and no special stop reason, but the value differs by one capital. Compare case-insensitively. Never define two enum values that differ only in case.<sup>[8]</sup> It shows up in a branch testing exact string equality, far from the request. Lowercase both sides and the problem class disappears.
 
-**Enum values may not match your capitalisation.** The response completes normally. It raises no error and carries no special stop reason. The value just differs from the schema in a capital letter. So compare case-insensitively, and never define two enum values that differ only in case.<sup>[8]</sup> This surfaces in a downstream branch that checks for exact string equality, several stages away from the request. Lowercase both sides before comparing, and that whole class of defect disappears.
+The schema the model sees may differ from yours. SDK helpers drop features the platform lacks. They move the constraint into the field's description and close objects to extra properties. So number and length bounds are checked by your validation, not by the grammar.<sup>[8]</sup> The contract holds in two places, and only one is the model.
 
-**The schema the model receives may not be the one you wrote.** **SDK helpers strip features** the platform does not support. They add the constraint to the field's description instead, and they close objects to additional properties. So numeric and length bounds are **enforced by your validation**, not by the grammar.<sup>[8]</sup> The contract is still honoured. It is honoured in two places, and only one of them is the model.
+Complexity is a budget with a hard edge. Documented caps limit how many strict tools a request can carry, how many optional parameters all its schemas hold, and how many parameters use union types. Unions cost most, since they multiply compile cost. Exceed the compiled size and the request fails with a complexity error, even if each individual cap was met.<sup>[8]</sup> So schema complexity is shared across the whole request. Budget it there.
 
-**Complexity is a budget with a hard edge.** There are documented ceilings on three things:
-- how many **strict tools** one request may carry
-- **optional parameters** across all schemas in the request
-- parameters with **union types** (a field that can be one of several types). These are the expensive ones, because they multiply compilation cost.
+One more party shows up most in scenarios. A single call carries exactly one output contract. Take two jobs judged differently: sorting a ticket (success is the right category) and writing a reply (success is an acceptable answer). Those are two contracts, and one call cannot hold both. Merging them to save cost only wins if you ignore quality. Separate calls give each stage its own schema, a prompt aimed at one job, and an evaluation against the right standard.
 
-If you go past the compiled size, the request **fails outright** with a **complexity error**, even when every individual limit was met.<sup>[8]</sup> So schema design is a shared resource across a request. It is not a per-field decision. Budget it across the whole request.
+The named failure is a schema written only for the model. It describes a good answer, but nobody asked the consumer what it needs. Someone adds a field. The lenient parser keeps working. A downstream service silently gets a shape nobody agreed to. Chapter 6 covers checking what comes back. The duty here comes earlier: write the schema from what the consumer needs, and change it on the consumer's schedule. Ask the consumer first.
 
-**One call carries exactly one output contract.** This is the point scenarios test hardest. Say a system does two things that are judged differently. One is a classification, where success means the right category. The other is a drafted reply, where success means an acceptable answer. Those are two contracts, and one call cannot hold both. The usual argument for merging them is cost. That argument only holds while quality is left out of the comparison. Separate calls give each stage three things:
-- a **schema shaped for its own output**
-- a **prompt aimed at one job**
-- an evaluation against the standard that actually applies to it
-
-**The named failure: the schema written for the model alone.** It describes what a good answer contains. It reads beautifully. It never asked the consumer what it needs to do with the result. Then somebody adds a field, the parser keeps working because the parser was lenient, and a downstream service quietly receives a shape nobody agreed to. Chapter 6 covers validating what comes back. The design duty here comes earlier. Write the schema from the **consumer's requirements**, and change it on the **consumer's schedule**. Ask the consumer first.
-
-**ELI5.** A schema is a form that three people have to read the same way: the model, the program that uses the answer, and the platform. If you design the form only for the model, the other two get surprised. So ask the person who uses the answer what they need, and keep one job per form.
+**ELI5.** A schema is like a form with boxes. The writer, the reader and the printer must all agree on the boxes. Move a box without telling the reader and they get lost.
 
 ## Continue, Resume and Fork Answer Different Questions About Whose History You Get
 
-**First, the idea.** The SDK gives you three ways to get back into an existing conversation. They differ in how the session is found. In our picture, a session is a case file kept at the border post. The three ways are three different ways to pull a file.
+The API has no session notion, since every request brings its own history. The SDK offers three ways to reach an existing session. They differ in how the session is found, not in what happens afterwards.
 
-**No interface defines a session for you.** The API has no such concept, because every request carries its own history. The SDK gives you **three ways** to reach an existing session. They differ in how the session is found, not in what they do afterwards.
-- **Continue** picks up the **most recent session** in the current directory. Nothing has to be tracked.
-- **Resume** takes a **specific identifier** that your application captured and stored. This is what multi-user applications need.
-- **Fork** copies an existing history into a new session with a new identifier. The original's history is left untouched. So two independent threads exist afterwards.<sup>[9]</sup>
+**Continue** takes the latest session in the current directory, so you track nothing. **Resume** needs a specific identifier your app saved, and multi-user apps need exactly that. **Fork** copies one history into a new session with a new identifier, leaving the old one alone, so you end up with two separate threads.<sup>[9]</sup>
 
-**The access-control problem.** Read those definitions as an access-control question and one of them becomes alarming. "The most recent session in this directory" is not the same statement as "this user's session". In a service handling several conversations at once, continue resolves by recency, not by identity. This is the shape of defect an exam will describe. Context from one conversation shows up in an unrelated one, and there is no bug anywhere in the code. Identity has to select the session, and only an identifier does that.
+Now treat those as an access question and one turns scary. "Latest session in this directory" does not mean "this user's session". A service juggling several conversations with continue is choosing by recency, not identity. That is the bug an exam will describe: one conversation's context appearing in another, with no bug in the code. Identity must choose the session, and only an identifier does.
 
-**Session files are local.** Session files are local to the machine that created them. So an application running on ephemeral workers or containers cannot resume by identifier alone. Attaching a **session store** mirrors transcripts to your own backend. The lookup key comes from the **working directory**, so a resuming host has to match the directory the original run used.<sup>[9]</sup> That is a deployment constraint hiding inside a conversation feature. Transcripts do not travel, and neither does the assumption that they do.
+Session files stay on the machine that made them. So an app on short-lived workers or containers cannot resume with an identifier alone. A session store copies transcripts to your own backend, and its lookup key comes from the working directory, so a resuming host must use the same directory as the original run.<sup>[9]</sup> That is a deployment limit hiding inside a chat feature. Transcripts do not travel.
 
-**Resuming restores less than people assume.** The gaps are deliberate.
-- Conversation history returns in full.
-- The model and the configured agent return.
-- The **permission mode returns**, with named exceptions. **Plan mode** and a **bypass mode** are never restored. A resumed session starts in the mode a new session would.
-- Command-line configuration passed at launch has to be passed again. That includes settings files, server configuration, plugin directories and added directories. The standard settings files are re-read on their own.<sup>[3]</sup>
+Resuming restores less than people expect, deliberately. Full conversation history returns. So do the model and the configured agent. The permission mode returns too, with named exceptions: plan mode and a bypass mode are never restored, so a resumed session starts in whatever mode a fresh one would. Settings given on the command line at launch, such as settings files, server configuration, plugin directories and added directories, must be passed again. The standard settings files are re-read automatically.<sup>[3]</sup> Pass your launch flags again.
 
-Pass your launch flags again.
+One pattern runs through all of it: content comes back, posture does not. Anything widening what the session may do is set up fresh at launch. That is a good default. It also means an operator who resumed and assumed elevated mode returned has less authority than they think. An application that assumed its flags returned has less configuration than it needs. Re-establish posture, openly, every time a session comes back.
 
-**The pattern.** Content is restored and posture is not. Posture means anything that widens what the session may do. That gets re-established on purpose at launch. This is the right default. It also explains two surprises:
-- An operator who resumed and assumed their elevated mode came back is running with **less authority** than they think.
-- An application that resumed and assumed its flags came back is running with **less configuration** than it needs.
-
-So re-establish posture at launch, explicitly, every time the session comes back.
-
-**ELI5.** A conversation is a folder. Continue grabs the newest folder. Resume grabs the folder with the name you wrote on it. Fork photocopies a folder so you have two. If lots of people use your app, always ask for the folder by name, or you will hand one person another person's papers.
+**ELI5.** A bookmark can mean "the last page anyone read" or "page 42 of my book". The first might open somebody else's page. The page number always opens yours.
 
 ## Three Doors Lead Into a New Conversation, and a Timeout Closes Only One
 
-**First, the idea.** Old material turning up in a new conversation is what this whole area exists to prevent. There are three separate ways a conversation can end. A timeout covers only one of them. In our picture, this is about when a case file is closed and the desk cleared at the border post.
+A user asks about a refund. An hour later they ask something unrelated. The assistant confidently brings up refund details nobody typed. That is stale context leaking into another conversation, and this area exists to stop it.
 
-**The failure.** **Stale context leaking** into an unrelated conversation has a specific shape. Material that was correct for a finished task turns up in a task that has nothing to do with it. It is phrased confidently. It comes from nothing the current user said. Nobody typed it.
+People usually propose one timeout. It is half an answer. A conversation can end three different ways, and each lets through what the others catch.
 
-**Why one timeout is not enough.** A single timeout is the usual proposed fix, and it is half an answer. There are three separate ways a conversation ends, and each one lets through material that the others catch.
-
-| Door | What triggers it | What it fails to cover alone |
+| Trigger | What sets it off | Where it falls short on its own |
 |---|---|---|
-| The clock | Idle time, or an absolute age since the session started | A session in continuous use that changed subject an hour ago |
-| An event | Logout, a completed transaction, a role change, an error the application cannot recover | Nothing at all happening for a long stretch between events |
-| Intent | The application deciding this request begins new work, or the user saying so | Anything the user does not think to ask for, since the guarantee then rests on their behaviour |
+| The clock | Idle time, or total age from the start | A busy session whose topic changed an hour ago |
+| An event | Logout, a finished purchase, a role change, an error the app cannot recover from | Long quiet gaps between events |
+| Intent | The app judging a request to be new work, or the user asking | Anything the user forgets to ask for, since the guarantee depends on them |
 
-**Look hard at the third row.** It is the one that gets offered as sufficient. Handing the reset to the user makes the property depend on a human remembering. Guarantees do not live in habits.
+Read the third row closely, since people offer it as enough. If you hand the reset to the user, the guarantee depends on a person remembering. Guarantees do not live in habits.
 
-**What a defensible answer looks like.** All three together:
-- **expiry**, so an abandoned session cannot live forever
-- **reset triggers**, so defined events clear state the moment they happen
-- **fresh-start rules**, so the application itself knows when a request is new work and not a continuation
+So a sound answer combines all three. **Expiry** stops an abandoned session living forever. **Reset triggers** clear state the moment a defined event happens. **Fresh-start rules** let the app itself know a request is new work, not a continuation. Each closes a path the other two leave open. So you add them. You do not choose one.
 
-Each door closes a path the other two leave open. That is why the arithmetic here is addition, not selection.
+Two facts sit underneath. Transcripts are kept, on a documented default measured in years, or for whatever finite retention period an organisation set. So "the session ended" and "the material is gone" say unrelated things.<sup>[6]</sup> Also, a long-idle session picked up later may be restored from a summary rather than in full, since the cache behind it expired. What the user experiences as continuity and the tokens actually resent are different things.<sup>[3]</sup> Deletion is its own question with its own answer.
 
-**Two operational facts sit under the design.**
-- **Transcripts are retained.** The documented default is measured in years. Or it is whatever finite retention period an organisation has configured. So "the session ended" and "the material is gone" are unrelated claims.<sup>[6]</sup>
-- A long-idle session that is picked up again may be **restored from a summary** instead of in full. That is because the cache behind it has expired. So the continuity a user feels and the tokens actually resent are two different things.<sup>[3]</sup>
+The named failure is a session that ends only when someone closes the tab. That is not a missing feature. Nobody specified it, so the default became whatever the interface did.
 
-Deletion is a separate question with a separate answer.
-
-**The named failure.** It is the session that ends only when somebody closes the tab. That is not a missing feature. It is a feature that was never specified, so the default became whatever the interface happened to do.
-
-**ELI5.** A conversation can end in three ways: the clock runs out, something important happens, or someone says "this is new work". Any one alone leaves a gap. So use all three. And remember that closing the conversation does not mean the record is thrown away.
+**ELI5.** A room can be tidied by a timer, by a bell when the game ends, or by a kid saying "clean up". One alone leaves mess sometimes. All three together keep it clean.
 
 ## Plugin Versions Are Pinned So a Regression Has Somewhere to Land
 
-**First, the idea.** The last area is the machinery around the edge, such as plugins. It changes by itself unless somebody stops it. In our picture, these are the tools and staff at the border post. If the supplier swaps them overnight, you will not know which one changed.
+The last row of the opening table is the tooling around the edge, and it changes by itself unless someone stops it.
 
-**The default.** This is the part worth memorising. A declared dependency (a plugin your plugin needs) **tracks the latest** available version. So an upstream release changes what is running under your extension. You get no action, no notification and no record on your side.<sup>[10]</sup> Nothing failed. The set of things running just is no longer the set that was tested.
+Learn the default. A declared dependency follows the latest version. So an upstream release can change what runs under your extension, with no action, notice or record from you.<sup>[10]</sup> Nothing failed. What is running just stopped matching what was tested.
 
-**A version constraint turns that into a decision.** Hold a dependency inside a **tested range** and installs stay on the **highest matching patch**. The upgrade moves to a moment somebody chose, by publishing a new version with a wider range.<sup>[10]</sup>
+A version constraint makes that a choice. Hold a dependency in a tested range and installs stay on the highest matching patch. The upgrade happens when someone decides, by publishing a new version with a wider range.<sup>[10]</sup> If several constraints cover one dependency, they intersect, and you get the highest version meeting all of them. If none does, the update is skipped and reported with the constraining extension named.<sup>[10]</sup> A clash looks like a clash, not like odd behaviour.
 
-**Several constraints intersect.** When several constraints sit on the same dependency, they intersect. The result is the highest version that satisfies all of them. When nothing satisfies every range, the **update is skipped and reported**, with the constraining extension named.<sup>[10]</sup> A conflict shows up as a conflict, not as odd behaviour.
+Resolution checks tags on the repository holding the dependency. The tag name pairs the plugin name with the version, and that version should match the manifest at that commit.<sup>[10]</sup> Two defaults come with this, both crossing rules with the choice already made. Automatic updating is off for marketplaces Anthropic does not operate. And a dependency from a different marketplace than the declaring extension is refused. Only an allowlist on the marketplace hosting the extension being installed opens it, and trust does not pass through middle marketplaces.<sup>[10]</sup> Trust is declared, never inherited.
 
-**How it resolves.**
-- Resolution runs against **tags** on the repository holding the dependency. The tag follows a **naming convention** that pairs the plugin name with the version. That version is expected to **match the manifest** at that commit.<sup>[10]</sup>
-- **Automatic updating is off by default** for marketplaces Anthropic does not operate.
-- A dependency living in a different marketplace from the extension declaring it is **refused by default**. It is opened only by an allowlist on the marketplace hosting the extension being installed. Trust deliberately does **not chain through intermediates**.<sup>[10]</sup>
+Chapter 18 treats versioning as day-to-day operations. The design duty is smaller: to blame a component for a regression, you need a record made before the change, written down earlier than the symptom. Pinning makes the record. Rollback is what the record buys. An unpinned dependency does worse than risk a break. It takes away your ability to prove what broke.
 
-Both defaults are crossing rules with a default already chosen. Trust is declared, never inherited.
+One packaging detail counts as design. A bundle's name prefixes every command in it. That lets two bundles ship the same command name without a clash, and renaming the bundle renames them all.<sup>[11]</sup> The name is part of the interface. Choose it once, early, while thinking about the interface and not the folder.
 
-**What belongs to design.** Chapter 18 covers versioning as an operational practice. What belongs to design is narrower, and it is a single duty: **attribution requires a record made before the change**. A regression can be traced to a component only if what that component was is written down somewhere that predates the symptom. Pinning is how the record gets made. **Rollback** (going back to the last good version) is what the record buys. An unpinned dependency does not just risk breaking. It removes the possibility of proving what broke.
+The anti-pattern is the dependency that follows latest. It is rarely chosen. It is a missing decision that looks like keeping up to date.
 
-**A packaging detail that matters for design.** A bundle's name is a **prefix on every command** it ships. That is what lets two bundles ship the same command name without colliding. Renaming the bundle renames all of them.<sup>[11]</sup> The name is part of the interface. So it is chosen once, early, by somebody thinking about the interface and not about the directory.
-
-**The anti-pattern: the dependency that tracks latest.** It is almost never a decision. It is the absence of one, wearing the look of staying current.
-
-**ELI5.** If your tools update by themselves, one day something breaks and you cannot tell which tool changed. So you write down the exact version you tested and only change it on purpose. Then you can always go back to the one that worked.
+**ELI5.** A recipe saying "use whatever flour the shop has today" tastes different each week. Nobody knows why. Write the exact flour down, and you can bake last month's good cake again.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on application design are unusually convincing, because most of them describe real engineering that a competent team does. What makes one wrong is a single assumption sitting under it. Four assumptions produce most of them.
+Wrong answers here are convincing, since most describe real engineering. One hidden assumption makes each wrong, and four cover most of them.
 
-**The four wrong assumptions:**
-- **A guarantee claimed for a mechanism that only improves adherence.** An option strengthens a written instruction, restructures a prompt, or adds guidance about what the model should refuse. It answers a scenario asking that something never happen. But instructions shift probability. Code that runs before the action decides. Whenever the requirement contains the word "never", ask which component would have to fail for the outcome to occur. Then pick the option that names one.
-- **One control offered against a failure with several entrances.** Examples are a timeout aimed at stale context, a screen on user input while tool output goes unchecked, or a check at one seam in a system with four. The option is correct about the path it covers and silent about the rest. That is what makes it read as an answer. A scenario naming several ways in wants a set, not a pick.
-- **A boundary drawn around the obvious payload and not around its neighbours.** Prompts get protected while attachment filenames, schema definitions, cached artifacts and transcript retention go unconsidered. Ask what else travelled with the content, and what is stored that is not the content.
-- **Enforcement placed where the habit is, not where the authority is.** Examples are instructions written into tool results, standing rules appended to the newest turn, a policy documented for humans and checked by nobody, and a session that resolves by recency where identity was required. Each one puts the control on a channel that carries no weight. Name the channel each option acts on. Then ask whether that channel binds anything.
+- **Promising a guarantee from something that only raises adherence.** An option tightens a written instruction, reworks a prompt, or adds guidance on what to refuse, when the scenario says something must never happen. Instructions shift odds. Code that runs first decides. If the requirement says never, ask which component would have to fail for it to happen. Choose the option naming one.
+- **A single control against a failure with many entrances.** A timeout for stale context. A screen on user input while tool output goes unchecked. A check at one seam in a system with four. The option is right about its path and silent on the rest, which is why it reads like an answer. When a scenario lists several ways in, it wants a set, not a pick.
+- **A boundary around the obvious payload, not its neighbours.** The prompt is protected. Attachment filenames, schema definitions, cached artifacts and transcript retention are forgotten. Ask what else travelled with the content, and what is stored that is not the content.
+- **Enforcement placed where the habit is, not where the authority is.** Instructions inside tool results. Standing rules tacked onto the newest turn. A policy written for humans that nobody checks. A session picked by recency when identity was needed. Each puts the control on a channel with no weight. Name the channel an option acts on, then ask if that channel binds anything.
 
-Match on what the scenario is doing, not on the domain it is dressed in.
+Match on what the scenario is doing, not the setting it is dressed in.
 
-| When the scenario says | The answer is usually | The trap is usually |
+| If the scenario describes | Usual answer | Usual trap |
 |---|---|---|
-| Context from a finished conversation surfaced in an unrelated one | Expiry, defined reset events, and application-owned rules for starting fresh, together | A single timeout, or asking users to start a new conversation themselves |
-| The same guidance behaves differently in the terminal and in an integration | State the rule on the channel each interface actually reads | Treating one surface's default context as if every surface supplied it |
-| A requirement says an action must never be possible | A deterministic check that runs before the action | Stronger wording, more emphasis, or a better-written instruction file |
-| Fetched or third-party content reaches the model | Deliver it as tool results, labelled, delimited, and screened before it is returned | Concatenating it into the standing instruction so the model definitely sees it |
-| Two stages have different inputs, outputs and standards of success | Separate calls, each with its own contract and its own evaluation | One call for both, argued on token cost with quality left out |
-| Downstream consumers keep breaking on well-formed output | Write the schema from what the consumer needs, and version it on the consumer's schedule | A schema describing a good answer, with parsing loosened until it passes |
-| Regulated or sensitive data is in scope | Ask where it appears, including filenames, metadata and schema definitions | Protecting message bodies alone and treating configuration as out of scope |
-| A behaviour changed and nobody can say which component moved | Pinned versions recorded before the change, giving a rollback target | Reproducing it, adding logging, or updating everything to current |
-| Where processing physically happens is a requirement | The geography controls, chosen against a decision that may be unchangeable later | Treating placement as an operational detail settled after the build |
-| Sessions are resumed on a different machine or worker | External session storage, keyed consistently, with identity selecting the session | Resuming by recency, or assuming a local transcript is reachable elsewhere |
+| Old chat context appearing in a different conversation | Expiry, set reset events and app-owned fresh-start rules, all three | One timeout, or telling users to open a new chat |
+| One piece of guidance acting differently in the terminal than in an integration | Put the rule on the channel each interface reads | Assuming every surface gets one surface's defaults |
+| A need for an action to be impossible | A check in code that runs before the action | Firmer wording, louder emphasis, a better instruction file |
+| Outside or third-party content reaching the model | Pass it as tool results, labelled, delimited and screened before return | Pasting it into the standing instruction so the model surely sees it |
+| Two stages whose inputs, outputs and success measures differ | Separate calls, each with its own contract and evaluation | One call for both, defended on token cost while ignoring quality |
+| Downstream consumers breaking on output that is well formed | Build the schema from the consumer's needs, versioned on its schedule | A schema describing a good answer, with parsing loosened until it passes |
+| Regulated or sensitive data in scope | Ask where it shows up, filenames, metadata and schema definitions included | Guarding message bodies only and calling configuration out of scope |
+| A behaviour shifted and nobody knows which component moved | Versions pinned before the change, giving a rollback target | Reproducing it, adding logs, or updating everything to current |
+| A requirement about where processing physically runs | The geography controls, picked knowing it may be unchangeable later | Treating placement as a detail to sort out after the build |
+| Sessions resumed on another machine or worker | External session storage, consistent keys, identity choosing the session | Resuming by recency, or assuming a local transcript can be reached elsewhere |
 
-**One habit that works past the table.** For every option, ask what would have to be true for the guarantee to hold. Then ask who checks it. If the answer to the second question is the model, the option is describing an improvement, not a control.
+One habit works beyond the table. For each option, ask what would have to be true for the guarantee to hold, then ask who checks it. If the second answer is the model, the option is an improvement, not a control.
 
-**ELI5.** Wrong answers sound sensible but fix only part of the problem. They ask the model nicely when you needed a locked door. Or they guard one gate when there are four. Always ask who really checks, and whether it is code or the model.
+**ELI5.** Wrong answers often sound clever but only ask nicely, or guard one door out of four. Ask who actually stops it. If the answer is "the model, if it feels like it", pick something else.
 
 ## What to Remember
 
-- A **crossing rule** names three things: what may **cross**, which **component decides**, and what **happens to material that fails**. An edge with no rule is not an absent edge. It is one where **nothing is checked**, because no component believes the check is its own.
-- **Interfaces differ in what already sits in context** before your text arrives. The **API is stateless** and supplies nothing. The **SDK defaults to a minimal prompt** covering tool calling, and the **coding preset** carries full style, safety and working-directory context. **Headless runs use that full prompt by default**. A rule the application depends on is **stated once per channel**.
-- **Project instruction files load as conversation context**, **not as system prompt**, and they load by setting source, not by preset. Two switches, and neither implies the other.
-- **Context shapes a decision**. A **deterministic gate removes one**. Instruction files and accumulated notes are **read as context, never as enforced configuration**. So blocking an action regardless of what the model decides needs a **hook or a check that runs first**.
-- **Authority follows the channel content arrived** on. Third-party material belongs in **tool results, labelled and delimited**, with the policy stated in the system prompt. Your **own instructions do not belong in tool results**, because content there is treated as untrusted and may be ignored.
-- **Content boundaries run outbound too**. Regulated data appears in **message content, attached files, and filenames and metadata**. It does **not** appear in workspace names, user contact details, billing or support tickets. **Schemas are compiled and cached separately** and do **not** carry the same protections, so no regulated value goes in a schema definition.
-- **Geography is two settings**. One is a **per-request inference control** with a workspace default. The other is a **workspace location fixed at creation** that cannot be changed afterwards.
-- A **schema is a contract** with the **model, the consumer, and the platform**. **Required properties are emitted first**, then optional ones. **Enum capitalisation is not guaranteed**, so compare case-insensitively. **SDK helpers strip unsupported constraints** and enforce them in your validation instead. **Strict tools, optional parameters and union types** share **one complexity budget** that fails the request when exceeded.
-- **One call carries one output contract**. Stages judged by different standards of success need **separate calls with separate schemas**. The cost argument for merging them leaves out quality.
-- **Continue resolves by recency**, **resume resolves by identifier**, and **fork copies a history** into a new identifier. In anything serving more than one conversation, **identity must select the session**, which only an identifier does.
-- **Resuming restores content, not posture**. History, model and agent return. **Plan and bypass permission modes never** do, and **launch-time configuration must be passed again**. **Session files are local to the machine** that made them, so cross-host resumption needs an external store.
-- **Three doors lead into a new conversation**: the **clock** (idle or absolute age), an **event** (logout, completion, role change, unrecoverable error), and **intent** (the application deciding the request is new work). **All three are required**, because each covers a path the other two leave open. A **rule that depends on the user acting** is **not a guarantee**.
-- **Ending a session does not delete the transcript**. Retention runs on a **documented default measured in years**, or on the organisation's configured period.
-- An **unpinned dependency tracks latest**, so upstream releases change what is running with **no action and no record**. **Constraints intersect** across everything that declares them, and a **conflict is reported, not silently resolved**.
-- **Attribution requires a record made before the change**. Pinning creates it, **rollback is what it buys**, and an unpinned component removes the ability to prove what broke.
+- A **crossing rule** has three parts: what may cross, which component decides, and what happens to material that fails. No rule does not mean no edge. It means nothing gets checked, because no component thinks the check is its own.
+- Interfaces start with different things in context before your text. The API is stateless and gives nothing. The SDK defaults to a minimal prompt for tool calling, while the coding preset adds full style, safety and working-directory context. Headless runs use that full prompt by default. Any rule your app depends on gets stated once per channel.
+- Project instruction files enter as conversation context, not system prompt, and load by setting source, not preset. Two switches. Neither implies the other.
+- Context shapes a decision. A deterministic gate removes it. Instruction files and collected notes are read as context and are never enforced configuration. To block an action whatever the model decides, use a hook or a check that runs first.
+- Authority follows the channel content came through. Third-party material goes in tool results, labelled and delimited, with the policy in the system prompt. Keep your own instructions out of tool results, since content there is untrusted and may be ignored.
+- Boundaries cover outbound traffic too. Regulated data shows up in message content, attached files, and filenames and metadata. It does not show up in workspace names, user contact details, billing or support tickets. Schemas are compiled and cached apart from messages and lack the same protections, so keep regulated values out of schema definitions.
+- Geography has two settings: a per-request inference control with a workspace default, and a workspace location fixed at creation that never changes.
+- A schema is a contract with the model, the consumer and the platform. Required properties are emitted first, then optional ones. Enum capitalisation is not guaranteed, so compare case-insensitively. SDK helpers strip constraints the platform does not support, and your validation enforces them instead. Strict tools, optional parameters and union types share one complexity budget, and the request fails when it is exceeded.
+- A call carries one output contract. Stages judged by different success standards need separate calls and separate schemas. The cost case for merging leaves quality out.
+- Continue picks by recency, resume by identifier, and fork copies a history into a new identifier. Wherever more than one conversation runs, identity must select the session, and only an identifier does that.
+- Resuming brings back content, not posture. History, model and agent return. Plan and bypass permission modes never return, and launch-time configuration must be passed again. Session files are local to the machine that made them, so resuming on another host needs an external store.
+- Three doors lead to a new conversation: the clock (idle or absolute age), an event (logout, completion, role change, unrecoverable error) and intent (the application deciding the request is new work). You need all three, since each covers a path the other two miss. A rule that needs the user to act is no guarantee.
+- Ending a session leaves the transcript. Retention follows a documented default measured in years, or the organisation's configured period.
+- An unpinned dependency follows latest, so upstream releases change what runs with no action and no record. Constraints intersect across everything that declares them, and a conflict gets reported, never quietly settled.
+- To pin down blame you need a record made before the change. Pinning creates it, rollback is what it buys, and an unpinned component removes the ability to prove what broke.
 
-**ELI5.** Your app has a border, and you must guard it on purpose. Write down what may cross and who checks. Use real locks for "never" and signs for "please". Ask for conversation folders by name, clear the desk in three ways, and write down which tool versions you tested.
+**ELI5.** Draw the border, put a real gate on it and watch both directions. Write down the exact versions you use. Clear old chats three ways so nothing old leaks into something new.
 
 ## Endnotes for this chapter
 

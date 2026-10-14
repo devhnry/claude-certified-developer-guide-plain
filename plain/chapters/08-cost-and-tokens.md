@@ -1,165 +1,133 @@
 # Chapter 8: Cost Follows What You Resend, Not What You Ask
 
-**Summary**: *A conversation gets more expensive per exchange as it lengthens, while the questions stay exactly the same size. Nothing about the workload changed. The history went up again (the folder went back in the courier's bag), and it will go up again next turn, and the turn after that. Read the bill that way and token budgeting, usage tracking and caching stop being three topics. They become one question asked three times: what is resent, what rate is it charged at, and what could be read back instead of processed again.*
+**Summary**: *A chat gets pricier per exchange as it grows, even though each question is the same size. The work did not change. The history grew, and it grows again next turn. Read the bill this way and three topics become one question asked three times. What gets resent? What rate is it charged at? What could be read back instead of processed again?*
 
 ## Turn Forty Costs More Than Turn One Because It Carries Turn One
 
-**First, the idea.** Every time you ask Claude something, you pay for the whole conversation so far, not just your new question. Think of a courier service. Each turn, you hand the courier a **request** (a parcel). The parcel must hold the whole folder: the **history**. You pay by weight, and weight is **tokens** (small chunks of text). The courier also brings back a written reply, which is the **output**.
+Imagine a tutor who forgets everything between questions. Before each answer, you read the whole notebook aloud. Your page-40 question is one line. The reading is forty pages.
 
-**What goes in the parcel?** Ask a **short question** of a **long conversation** and you are **not billed** for a short question. Every request **carries the whole history**:
-- the system prompt
-- the tool definitions
-- every earlier exchange
-- every tool result
+The API works like that. Every request carries the full history: system prompt, tool definitions, every earlier exchange and every tool result. In a forty-turn task, the first turn is sent forty times. So cost grows with roughly the square of the turn count, not in a straight line.<sup>[1]</sup>
 
-**The problem: the folder gets resent.** A task running forty turns has **sent its first turn forty times**. So cost climbs with roughly the **square of the turn count** rather than in a straight line.<sup>[1]</sup> Humans asked one thing per turn. The application **paid again** for everything already said.
+Call this **carried cost**. It is what a request pays again for material an earlier request already paid for. The model needs that history, so it is not waste. But it is the part that grows while the questions stay put. On a long run it dwarfs anything you save by trimming the current turn.
 
-**Carried cost.** Call it **carried cost** (the weight of the old folder). It is what this request is charged for **material you sent**, and were charged for, on an earlier one. The history is doing a job, so it is not waste. It is the term that grows while the questions do not. On a long run it **dwarfs anything trimming reclaims** from the current turn.
+So a per-request average forecasts long sessions badly, unless it came from real ones. And the best lever is not deleting history. It is paying a tenth of the price for the same words (the notebook read at the cache rate).
 
-**Two consequences:**
-- A projection built from a **per-request average misjudges long sessions** unless that average came from real ones.
-- The **strongest lever** is not removing history. It is having the **same bytes charged at a tenth** of the price.
-
-**ELI5.** Every time you send the courier, you have to send the whole folder again, plus your new note. So the longer the folder, the more each trip costs, even if your new note is tiny. The trick is not to throw pages away. It is to pay much less for pages the courier has seen before.
+**ELI5.** A helper forgets everything after each question, so you read them your whole notebook first. The notebook keeps growing. Each tiny question costs more.
 
 ## Input, Output and the Two Cache Rates Are Four Different Prices
 
-**First, the idea.** A **cost model** needs every quantity the billing depends on. The first thing to know is that a **token is not a token**. Different kinds of tokens have different prices.
+A token is not a token. Kinds differ in price, so a cost model counts each.
 
-**The rate card.** Rates are set against the base input price. Think of the courier's price list. Weight going out in the parcel is **input**. The reply the courier writes back is **output**. Storing a copy of the folder at the courier's depot is a **cache write**. Pulling that stored copy back out is a **cache read**.
-
-| What is charged | Rate, against base input | Quantity |
+| What is charged | Rate, against base input | What it covers |
 |---|---|---|
-| Input (the parcel) | 1x | The whole request, history included |
-| Output (the written reply) | Higher, the pricier side per token | The task, capped by `max_tokens` |
-| Cache write, 5 minutes (a short stay at the depot) | 1.25x | What is new behind your checkpoint |
-| Cache write, 1 hour (a longer stay at the depot) | 2x | The same, held longer |
-| Cache read (taking the copy back out) | 0.1x | What matched a live entry |
+| Input | 1x | The full request, history too |
+| Output | Higher, per token | The reply, capped by `max_tokens` |
+| Cache write, 5 minutes | 1.25x | New text after your checkpoint |
+| Cache write, 1 hour | 2x | Same, held longer |
+| Cache read | 0.1x | Text that hit a live entry |
 
-**Output costs more.** The frontier model publishes output at **five times its own input rate**. That is the shape to carry. A model that **talks a lot is expensive**, in a way that trimming the prompt never touches. **Reasoning tokens** land on the output side too.
+The newest frontier model charges five times its input rate for output. So a chatty model is expensive in a way a shorter prompt never fixes. Reasoning tokens are output too.
 
-**Why output costs more.** The reason is worth holding because it makes the fact impossible to reverse under pressure. A **prompt is processed once**, in a **single pass over everything** you sent. Generation runs **one token at a time**. Every one of those tokens costs **its own pass** through the model, conditioned on all the text ahead of it. So you buy one traversal for the prompt and **one per token produced**. That is why the two sit on **separate budget lines**. Spend tracks **how much the system says** far more closely than how much it is told. **One averaged rate** quietly **under-prices** every design that talks.
+Why? The model reads your prompt in one pass but writes one token at a time. So input and output sit on separate budget lines. One averaged rate under-prices any design that talks a lot.
 
-**Three facts fall out of the table:**
-- A **read at a tenth** means five-minute caching **repays its write after one hit** and the hour version after two.
-- The **multipliers stack** rather than replace. So asynchronous submission (sending work in bulk and waiting for it), at half off every token including cached ones, applies on top of a cache read.<sup>[2]</sup><sup>[6]</sup>
-- **`max_tokens` caps a response invisibly** to the model. So lowering it never makes Claude economise. The turn that needed the room is truncated, discarded and billed anyway. A **task budget the model can watch** changes what it does.<sup>[1]</sup>
+Three facts follow.
 
-**ELI5.** Sending a parcel, getting a handwritten reply, and using the depot all have different prices. Writing the reply is the pricey part because the courier writes it one word at a time. Getting a stored copy back from the depot is very cheap, about a tenth of the normal price.
+- A read costs a tenth. So a five-minute write pays for itself after one hit. The hour version pays back after two.
+- The discounts stack. Asynchronous submission takes half off every token, cached ones too, on top of a cache read.<sup>[2]</sup><sup>[6]</sup>
+- `max_tokens` is a cap the model cannot see. Lowering it never makes Claude save words. The turn that needed the room is cut off, discarded and still billed. A **task budget** is different. The model can watch it, so it changes behaviour.<sup>[1]</sup>
+
+**ELI5.** Re-reading a page costs a little. Writing a new one takes far longer. A bookmark makes re-reading nearly free.
 
 ## A Projection Needs Five Quantities, and Every One Is Knowable Before You Ship
 
-**First, the idea.** A **projection** is your estimate of the bill before you launch. Estimates rarely get argued about over arithmetic. Somebody **left a term out** and put a **comparison in its place**.
+Forecasts rarely fail on maths. Someone dropped a number and put a comparison in its place.
 
-**The five quantities.** Think of it as working out how many trips the courier will make and how heavy each parcel is.
-
-| Quantity | Where the number comes from before launch | What losing it does |
+| Quantity | Where it comes from before launch | If you lose it |
 |---|---|---|
-| Requests per period (number of trips) | The forecast, or the traffic this replaces | A price with nothing to multiply |
-| Tokens sent per request (weight of the parcel) | Counted, not estimated: the counting endpoint takes a real request body and returns the count without running inference, free<sup>[5]</sup> | The largest term becomes an opinion |
-| Tokens returned per request (weight of the reply) | A sample run across representative inputs | The dearer side of the bill vanishes |
-| Rates for the model and features chosen (the price list) | Published per model, per operation | You price a design somebody else built |
-| Share of input expected from cache (how much comes from the depot) | The prefix you can hold stable | A cached prefix overstated tenfold |
+| Requests per period | Your forecast, or the traffic this replaces | Nothing to multiply the price by |
+| Tokens sent per request | Counted, not guessed. The counting endpoint takes a real request body and returns the count without running inference. It is free.<sup>[5]</sup> | The biggest term becomes an opinion |
+| Tokens returned per request | A sample run on typical inputs | The pricier side vanishes |
+| Rates for the model and features chosen | Published, per model and per operation | You price somebody else's design |
+| Share of input expected from cache | The prefix you can hold stable | Cache savings overstated tenfold |
 
-**Two named traps.** Both look like diligence.
-- The **borrowed baseline** scales last year's **cost per request**, or a neighbouring team's. It imports a different token profile and price list with it.
-- The **deferred number** calls **token counts unknowable until production**. That removes the quantities the bill is proportional to.
+Two traps look like diligence. The **borrowed baseline** scales last year's cost per request, or another team's. That imports a different token mix and price list. The **deferred number** says token counts can't be known until production. That discards what the bill is proportional to.
 
-**The test.** Neither trap survives one question. What here was **measured**?
-
-**ELI5.** To guess the courier bill, you need to know how many trips, how heavy each way, and the price list. You can weigh a parcel before you send it, so there is no excuse to say "we'll find out later". Borrowing someone else's bill is like using their price list for your parcels.
+**ELI5.** To guess a taxi fare you need distance, speed and price per mile. Skip one and you are wishing. Most of them can be measured before you leave.
 
 ## You Cannot Cut What You Have Not Attributed
 
-**First, the idea.** **Attribution** means knowing which part of your app caused which part of the bill. Without it you cannot cut the right thing.
+Log three things on every call: tokens in, tokens out, and which feature made the call.
 
-**What to log.** Log three things on every call. **Tokens in**, **tokens out**, and which **feature made** it. This is like writing on each courier receipt which department sent it.
+Without them, a spike says only that the total is high. One step often carries most of the spend.
 
-**Why it matters.** Without the receipts, a **cost spike** supports one question, which is why the **total is high**. With them it supports the useful one: which step, on which kind of request. A flow that looks **uniformly expensive** usually is not. One step commonly **carries most of the spend**.
+So measure before you fix. Without numbers, every fix hits everything. The **uniform cut** trims every feature equally, even ones that never drove the bill. The **blanket downgrade** gives up quality everywhere to save money that sat in a few places.
 
-**Attribution comes before optimisation**, and not for tidiness. Every remedy available to a team that has not measured is an **across-the-board remedy**:
-- The **uniform cut** applies one reduction to features that were **never driving anything**. Nobody can say which had room to absorb it.
-- The **blanket downgrade** trades quality on all traffic against **spend concentrated** in some of it.
+Three details keep the numbers honest.
 
-**Three mechanics decide whether the numbers are true:**
-- **Parallel tool calls** in one turn share an identifier and repeat the same usage figures. So **deduplicate rather than sum**.
-- Once an agent spawns subagents, the **plain usage field undercounts**. Whole-tree accounting comes from the **per-model breakdown**.
-- Totals are per call. So a session making several calls is yours to accumulate.<sup>[7]</sup>
+- Parallel tool calls in one turn share an identifier and repeat the same usage. Deduplicate them. Do not add them.
+- Once an agent spawns subagents, the plain usage field undercounts. The per-model breakdown gives the whole-tree total.
+- Totals come per call. If a session makes several calls, you accumulate them.<sup>[7]</sup>
 
-**Tools above your own code.** Claude Code attributes recent consumption to **skills, subagents, plugins and MCP servers**. Per-user metrics export over **OpenTelemetry**.<sup>[8]</sup>
+Claude Code itself attributes recent use to skills, subagents, plugins and MCP servers. Per-user metrics export over OpenTelemetry.<sup>[8]</sup>
 
-**ELI5.** If you only see one big bill at the end of the month, you do not know who spent it. If every receipt says which department sent it, you can find the one that spent most. Then you only fix that one.
+**ELI5.** A phone bill is high. Which app ate the data? Trimming every app a bit won't help. Find the greedy one first.
 
 ## Caching Reuses the Prefix Instead of Deleting It
 
-**First, the idea.** **Prompt caching** means the depot keeps a copy of the start of your folder. Next time, the courier reads it from the depot at a tenth of the price instead of weighing it all again. The start of the request is called the **prefix**.
+Say a chat app gets expensive. The urge is to cut: keep two messages, summarise each turn, drop tool results. Each saves money by hurting the product. Caching attacks the same cost and leaves the content alone.<sup>[1]</sup> Think of a copy of the notebook the tutor already read (a cache entry), not torn-out pages.
 
-**The wrong reflex.** Watch a multi-turn application get expensive and the reflex is to cut:
-- keep the last two messages
-- summarise after every turn
-- stop sending tool results
+A prefix is built in one order: tools, then system, then messages. A change at any level invalidates that level and all after it. The text must match exactly, byte for byte. A **cache checkpoint** marks where a reusable stretch ends. You get four per request at most, and writes happen only at a checkpoint. A later request hashes its own checkpoint. With no match, it walks back at most 20 positions, hunting for an entry an earlier request wrote.<sup>[3]</sup>
 
-Each shrinks the bill by **damaging the product**. Summarising also adds a **billed call per turn**. **Caching attacks the identical quantity** and leaves the content alone.<sup>[1]</sup>
+The commonest failure: put the checkpoint on a block that changes every request. The saved copy is keyed to text that never returns. You pay every write and read nothing back. The **moving prefix** is the same bug placed earlier. A timestamp or request ID sits before the stable content. Anthropic measured a 25-token status line at the front of a system prompt. It lifted one run from $0.59 to $4.24, worse than caching off.<sup>[1]</sup> Put per-request text in the latest user message.
 
-**How prefixes are built.** Prefixes assemble in one order: **tools, then system, then messages**. A change at any level **invalidates that level** and everything after it. Matching is **exact, byte for byte**.
-
-**Checkpoints.** A **cache checkpoint** marks where a reusable stretch ends (the line on the folder saying "keep a copy up to here"). You get **four per request at most**, and a write happens only at a checkpoint. A later request hashes its own checkpoint. If there is no match, it walks backward through at most **20 positions**, hunting for an entry an earlier request wrote.<sup>[3]</sup>
-
-**The commonest failure.** Put the checkpoint on a **block that changes every request**. Then the entry is keyed to content that never recurs. You pay each write and **read nothing back**.
-
-**The moving prefix** is the same defect one step earlier. It is a timestamp or a request identifier ahead of the stable content. Anthropic measured a **25-token status line** at the front of a system prompt taking one run from **$0.59 to $4.24**, **worse than caching off**.<sup>[1]</sup> Per-request text belongs in the **newest user turn**.
-
-**Three conditions** must hold together or the workload gets nothing.
+Three conditions must hold together.
 
 | Condition | Why it bites |
 |---|---|
-| The prefix is identical | One added word ahead of the checkpoint is a full reprocess |
-| It recurs inside the lifetime (the copy is still at the depot) | Five minutes by default, refreshed free on each hit, timed from the start of the request rather than the end of the response |
-| It clears the minimum length | Varies by model, and a short prompt is processed with no caching and no error<sup>[3]</sup> |
+| The prefix is identical | One added word before the checkpoint forces a full reprocess |
+| It returns within the lifetime | Five minutes by default, refreshed free on each hit. The clock starts when the request starts, not when the reply ends |
+| It clears the minimum length | The minimum depends on the model. A short prompt runs uncached with no error<sup>[3]</sup> |
 
-**The silent failure.** The silence in that last row is the trap. **Both usage counters read zero**, and that is the entire signal. This is also the difference between the two diagnostics:
-- **Usage** answers whether the **cache hit**.
-- Cache **diagnostics** answers what changed. It names the **first divergence** among model, system, tools and messages.<sup>[4]</sup>
+The last row is quiet, and that is the trap. Both usage counters read zero. That is the whole signal. The two diagnostics differ too. Usage says whether the cache hit. Cache diagnostics says what changed, naming the first divergence among model, system, tools and messages.<sup>[4]</sup>
 
-**When the default lifetime is too short.** A loop **waiting on humans between turns** comes back in minutes, not seconds. So the **entry expires unused**. That is what the **hour-long write** buys, at **twice the price**. It repays itself on the first miss it prevents.<sup>[1]</sup>
+The default lifetime fails one pattern. A loop that waits on people returns after minutes, so the entry expires unused. The hour-long write fixes that. It costs twice the price and pays back on the first miss it prevents.<sup>[1]</sup>
 
-**ELI5.** Instead of throwing pages out of the folder, you ask the depot to remember the first part. If the first part is exactly the same next time, it is nearly free. But if even one word at the start changes, the depot says "never seen it". And if you wait too long, the depot throws its copy away.
+**ELI5.** Keep a copy the tutor already read, instead of tearing out pages. It only helps if it is word for word the same, you return soon, and it is long enough.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on cost are rarely reckless. They are a **real economy applied to the wrong term**, which is why each reads as reasonable. **Four assumptions** produce most of them.
+Wrong cost answers apply a real saving to the wrong term, so each sounds fine. Four habits cause most of them.
 
-**The four wrong assumptions:**
-- **Deletion offered where reuse was available.** Examples are **truncating history**, **summarising every turn** and **dropping tool results**. These are right when material is finished, which chapter 7 covers. They are wrong when a **stable prefix is resent** and the conversation still needs it.
-- **A term missing from the model.** Examples are **output omitted**, **token counts postponed to production** and a **per-request figure imported from elsewhere**. Each needs its missing quantity not to vary. No scenario asking for a projection says that.
-- **An untargeted remedy for a problem nobody located.** Examples are a **uniform reduction**, a move to the **cheapest model**, or a declaration that **growth is unavoidable**. All three assume **spend is spread evenly**, which nobody measured.
-- **A control the model cannot see, treated as a budget.** **Lowering the reply cap** changes what survives, not what is spent.
+- **Deletion where reuse was possible.** Chopping history, summarising, dropping tool results. Fine for finished material (chapter 7). Wrong when the chat still needs a stable prefix.
+- **A missing term.** Output left out, counts postponed, or a figure borrowed. That only works if the missing number never varies. No scenario says so.
+- **An untargeted fix for an unlocated problem.** Across-the-board cuts, the cheapest model, or "growth is unavoidable". All assume spend is even. Nobody measured that.
+- **A hidden control treated as a budget.** A lower reply cap decides what survives, not what you spend.
 
 | When the scenario says | The answer is usually | The trap is usually |
 |---|---|---|
-| Cost per exchange climbs as conversations lengthen, requests unchanged | Cache the stable prefix, so resent history bills at the read rate | Truncating to recent turns, or summarising every turn |
-| Nobody can say which feature drives the bill | Instrument token usage per feature, then decide | A uniform cut, a downgrade, or accepting the growth |
-| A projection is wanted before launch | Volume, tokens up, tokens down, the rates, expected cache reads | Scaling a per-request cost from somewhere else |
-| Caching is on and the read counter sits at zero | Find the byte that moves ahead of the checkpoint | More checkpoints, or a longer lifetime |
-| Volume is high and nobody waits on any single result | Asynchronous submission, discounting every token | Treating it as interactive, or buying the saving with quality |
-| Spend must be capped without wrecking hard turns | A budget the model can see, with a hard limit behind it | Lowering the response cap, which discards work and bills it |
+| Chats grow longer, each exchange costs more, requests the same | Cache the stable prefix, so resent history bills at the read rate | Keeping only recent turns, or summarising each turn |
+| Nobody knows which feature drives the bill | Measure token use per feature first | An even cut, a downgrade, or shrugging at growth |
+| A forecast is due before launch | Volume, tokens up and down, rates, expected cache reads | Scaling a per-request cost taken from elsewhere |
+| Caching is on, read counter stays at zero | Find the byte that moves ahead of the checkpoint | Extra checkpoints, or a longer lifetime |
+| High volume, and no one waits on single results | Asynchronous submission, discounting every token | Treating it as interactive, or paying for savings with quality |
+| Cap spend without breaking hard turns | A budget the model can see, with a hard limit behind it | A lower response cap, which discards work and still bills it |
 
-**A habit that works past the table.** For any option, ask whether it changes how **many tokens move**, what **rate they are charged** at, or **only where the bill becomes visible**. Reporting shrinks nothing by itself. Deletion is one route among several to a smaller number.
+One habit outlasts the table. Ask of any option: does it move fewer tokens, change their rate, or only change where the bill shows?
 
-**ELI5.** Most wrong answers cut the wrong thing, guess a number nobody checked, or turn a knob the model cannot even see. The right answer usually asks: are we sending fewer tokens, paying a lower rate, or just looking at the bill differently?
+**ELI5.** Bad answers fix the wrong thing. They tear out pages when a bookmark would do.
 
 ## What to Remember
 
-- **Carried cost** is what a request pays **again** for material **sent on an earlier one**. Because every turn **resends the whole history**, a long task's cost grows with roughly the **square of its turn count** while the **questions stay the same size**.
-- **Four rates, not one price**: **input at 1x**, **output higher per token**, cache writes at **1.25x for five minutes** and **2x for an hour**, **cache reads at 0.1x**. A read at a tenth repays a five-minute write after **one hit** and an hour-long write after two. The **multipliers stack** with the asynchronous discount.
-- A **projection carries five quantities**: **request volume**, **tokens sent**, **tokens returned**, **rates** for the model chosen, and the **share expected from cache**. All are **knowable pre-launch**, because the **counting endpoint** returns input tokens free, without running inference.
-- **Attribution precedes optimisation**: **log tokens in, tokens out** and the **calling feature** per call. Every remedy available without it is **across the board** and damages features that **never drove spend**. **Deduplicate parallel tool calls** sharing one identifier, read subagent spend from the **per-model breakdown**, and **accumulate per-call totals** yourself.
-- **Caching reuses the prefix** rather than deleting it. It beats **truncation and per-turn summarising** while the conversation still needs its history. Prefixes build **tools, then system, then messages**, so a **change at one level invalidates** everything after it.
-- A **cache checkpoint** marks where a reusable stretch ends, **four per request at most**. A **write happens only at a checkpoint**, and a **read walks back 20 blocks** at most hunting one. Put a checkpoint on **content that changes each request** and you **pay every write**, reading nothing back.
-- **Caching needs three conditions** together: **identical bytes**, **recurrence inside the lifetime** (**five minutes**, refreshed free on each hit), and a prefix over the **model's minimum**. Falling short is **silent**: no error, **both usage counters at zero**. That is when diagnostics names the **first divergence** among **model, system, tools and messages**.
-- A **task budget** is **visible to the model**, so it changes what Claude does. **`max_tokens` caps a response invisibly**: lowering it **discards the turn** that needed the room and **bills it anyway**.
+- Carried cost is paying again for material sent on an earlier request. Every turn resends the whole history, so a long task's cost grows with roughly the square of its turn count while the questions stay the same size.
+- Four rates, not one price: input at 1x, output higher per token, cache writes at 1.25x for five minutes and 2x for an hour, cache reads at 0.1x. A read repays a five-minute write after one hit and an hour write after two. The multipliers stack with the asynchronous discount.
+- A projection needs five quantities: request volume, tokens sent, tokens returned, rates for the model chosen, and the share expected from cache. All are knowable before launch, because the counting endpoint returns input tokens free, without running inference.
+- Attribution comes before optimisation. Log tokens in, tokens out and the calling feature per call, because any remedy without it is across the board and hurts features that never drove spend. Deduplicate parallel tool calls sharing one identifier, read subagent spend from the per-model breakdown, and add up per-call totals yourself.
+- Caching reuses the prefix instead of deleting it, beating truncation and per-turn summarising while the conversation needs its history. Prefixes build tools, then system, then messages, so a change at one level invalidates everything after.
+- A cache checkpoint marks where a reusable stretch ends, four per request at most. A write happens only at a checkpoint, and a read walks back 20 blocks at most to find one. A checkpoint on content that changes each request pays every write and reads nothing back.
+- Caching needs three conditions together: identical bytes, a return inside the lifetime (five minutes, refreshed free on each hit), and a prefix over the model's minimum. Falling short is silent: no error, both usage counters at zero. Diagnostics then names the first divergence among model, system, tools and messages.
+- A task budget is visible to the model, so it changes what Claude does. `max_tokens` caps a response invisibly: lowering it discards the turn that needed the room and bills it anyway.
 
-**ELI5.** Every trip, the courier carries the whole folder, so long chats cost more each turn. The cheapest fix is the depot: keep a copy of the unchanged start and pay a tenth to read it. Keep the start exactly the same, come back in time, and weigh your parcels before you ship.
+**ELI5.** Long chats cost more because the whole notebook is read each time. Use a bookmark so most of it is read cheaply. Measure before you cut.
 
 ## Endnotes for this chapter
 

@@ -1,213 +1,164 @@
 # Chapter 5: Instruction Placement Is a Trust Decision
 
-**Summary**: *One sentence, written once, put in two different places, produces two systems that fail differently. That is the whole chapter. Where text sits decides three things. How long it applies. How many copies exist. And whether a stranger who supplied a document can edit your rules by writing a line into it. Placement comes first. Clarity, examples, output constraints and the loop that improves them all sit on top of a sort you either did or skipped.*
+**Summary**: *Put one sentence in two different places and you get two systems that break in different ways. Placement decides how long text applies, how many copies exist, and whether a stranger can rewrite your rules with one line in a document. Sort first. Wording, examples, output limits and the fix-it loop come after.*
 
 ## The Same Sentence in Two Places Is Two Different Systems
 
-**First, the idea.** Where you put an instruction matters as much as what it says. Think of a restaurant kitchen. The **house rules** are pinned on the kitchen wall (the top-level **`system`** field). Each **order ticket** is a single customer's request (the **user turn**). **Deliveries** from outside suppliers arrive in boxes (**`tool_result`** blocks). A rule pinned on the wall is trusted. A note found inside a delivery box is not.
+Picture a restaurant kitchen. The house recipe book is pinned to the wall. Every cook follows it on every order. The order ticket changes with each dish. Supplier boxes arrive at the back door and get checked first. We use it all chapter.
 
-**The example.** Take two prompts. Both carry the sentence *return one label from the fixed set and nothing else*, **spelled identically**.
-- In the first, it sits in the **top-level `system` field** (pinned on the wall). It is **written once**. It applies to every request the service will ever make, including the ones **nobody has written yet**.
-- In the second, it was **appended to the user turn** (scribbled on the ticket), under the ticket text, because that is where somebody was working when they thought of it. It now travels inside a string the turn-building code assembles. There are as many **copies as code paths**, and **copies drift** (they slowly stop matching each other).
+Take two prompts. Both say *return one label from the fixed set and nothing else*.
 
-**What's different?** Same words. Same model. Same ticket. The second system has **no single place** where its rules live. It also puts them in the channel that carries **text somebody else wrote**.
+In the first, the sentence sits in the top-level `system` field (the pinned recipe book). It is written once. It covers every request, even ones nobody has imagined yet.
 
-**The placement sort.** Sort every piece of text in a prompt by **two questions**. Call the result the **placement sort**.
-- How **long** does this text apply?
-- Who could have **written** it?
+In the second, someone typed it under the ticket text in the user turn, because that is where they were working. Now it rides inside a string your turn-building code assembles. Each code path makes its own copy, and the copies drift.
 
-**Lifetime decides** whether **text repeats**. **Authorship decides** whether it may **instruct**.
+Same words, same model, same ticket. Yet the second system has no single home for its rules, and it keeps them in the channel that carries text strangers wrote (a note on the order ticket).
 
-**ELI5.** A rule on the kitchen wall is seen by every cook, every day. A rule scribbled on one ticket is only seen once, and it might get copied wrong. A note inside a delivery box could have been written by anyone, so the cook should not take orders from it.
+The fix is the **placement sort**: two questions for every piece of text. How long is it true? Who could have written it? Lifetime tells you if it repeats. Authorship tells you if it may give orders.
+
+**ELI5.** A kitchen keeps lasting rules on the wall and tonight's order on a ticket. Write each rule on the wall once. Copy it onto tickets and the copies stop matching.
 
 ## Three Destinations, and Nothing You Did Not Write Reaches the First
 
-**First, the idea.** The sort has **three outcomes rather than two**. The third is the one developers skip.
+Developers think of two places. There are three.
 
-| The text | How long it applies | Who could have written it | Where it belongs |
+| Text | Lifetime | Possible author | Home |
 |---|---|---|---|
-| Role, tone, standing constraints (the house rules) | Every request, unchanged | You | Top-level `system` |
-| The output contract, and the rule that supplied content never instructs | Every request, unchanged | You | Top-level `system` |
-| Worked examples of the output (photos of finished dishes) | Every request, unchanged | You | `system`, tagged as examples |
-| This request's actual question (the order ticket) | One request | The user in front of you | The user turn |
-| A document the user attached | One request | Whoever handed it to them | The user turn, delimited (fenced off) |
-| A fetched page, inbound mail, OCR text (text read from a scanned image), a tool's return (the delivery boxes) | One request | Anybody at all | `tool_result` blocks |
+| Role, tone, standing constraints | Every request | You | Top-level `system` |
+| The output contract, plus the rule that supplied content never instructs | Every request | You | Top-level `system` |
+| Worked examples of the output | Every request | You | `system`, tagged as examples |
+| The question for this request | One request | The user in front of you | The user turn |
+| A document the user attached | One request | Whoever gave it to them | The user turn, delimited |
+| A fetched page, inbound mail, OCR text, a tool's return | One request | Anyone | `tool_result` blocks |
 
-**How to read it.** Read the right-hand column downward.
-- **Standing rules gather** in one field, **stated once**.
-- **Per-request material stays** in the turn.
-- **Third-party content** goes into **tool results**.
+Outsider content goes in tool results (the supplier's box at the back door). Anthropic says to use `tool_result` blocks, not `system` or plain user text. Claude is trained to doubt orders inside tool results more than elsewhere.<sup>[1]</sup>
 
-**Why tool results?** That is where Anthropic documents that it belongs. Deliver it inside `tool_result` blocks rather than in `system` or in plain user text. The reason is that Claude is **trained to treat directives** arriving inside tool results with **more scepticism** than directives elsewhere.<sup>[1]</sup>
+Chapter 3 added one twist. On supported models, a `"role": "system"` message can follow a user turn. It has the top-level field's authority but never comes first. So a late rule goes at the end and a cached prefix stays intact.<sup>[2]</sup>
 
-**One refinement from Chapter 3.** A message with **`"role": "system"`** may appear after a user turn on **supported models**. It carries the **same authority** as the top-level field, but it **never comes first**. So a rule that only becomes relevant later lands at the end of the history. It does this **without disturbing a cached prefix** (the saved start of the prompt).<sup>[2]</sup>
+The sort stops a quiet mistake, the document promoted to policy. Someone pastes a contract into the system prompt so the model surely sees it. Now the contract has your rules' authority, and any line addressed to a reader is addressed to Claude. It is a supplier's flyer stapled into the recipe book. Nobody attacked anything. Placement did it.
 
-**The problem: the document promoted to policy.** This is what the sort prevents. It never looks like a security decision at the time. Somebody pastes a contract into the system prompt so the model definitely sees it. That contract now **carries the authority your rules carry**. So any line in it addressed to a reader is **addressed to Claude**. Nobody attacked anything. **Placement did the damage alone**. In kitchen terms, the supplier's note got pinned to the wall.
+The mirror mistake is a standing rule put in the newest user message because recent text feels stickier. It does not hold that way, and it now sits beside pasted content.
 
-**The mirror image: the standing rule filed in the last turn.** Someone appends the rule to the newest user message, on a theory about recency (newest text counts most). Recency is not how a **standing constraint holds**. And the constraint now shares a channel with whatever got pasted in.
-
-**ELI5.** The kitchen has three places for paper. House rules go on the wall. Today's order goes on the ticket. Anything from a stranger stays in its box. If you pin a stranger's note on the wall, the cooks will start following it.
+**ELI5.** Your rules go on the wall, the order on the ticket, and a stranger's stuff in a checked box. A stranger's note never goes in the recipe book.
 
 ## An Instruction Is Checkable or It Is Decoration
 
-**First, the idea.** An instruction only helps if you can tell whether the output followed it.
+Write *be precise* and nobody can tell when they have complied. A grader cannot either.
 
-**Anthropic's test.** Adopt it whole. **Show the prompt to a colleague** with minimal context on the task and ask them to follow it. If that **human would be confused**, so is the model.<sup>[3]</sup>
+Anthropic's test: hand the prompt to a colleague who knows little about the task. If they would be confused, so is the model.<sup>[3]</sup>
 
-**What "checkable" means.** A human following *be precise* has no idea when they have complied. Neither has a grader. An instruction is **checkable** when output can be tested against it. For example:
-- a **named set of permitted values**
-- a **stated ceiling on length**
-- a rule saying which of **two conflicting sources wins**
+An instruction is **checkable** when you can test output against it. A named list of allowed values works. So does a length ceiling, or a rule for which of two clashing sources wins. The rest is a mood.
 
-The rest is a mood. "Make it taste good" is not a checkable rule for a cook. "Salt under 2 grams" is.
+Two habits help. Say what to do, since a ban removes one outcome and offers no replacement. And give the reason, which the model stretches to cases your words never named.<sup>[3]</sup>
 
-**Two documented refinements.**
-- **Say what to do** rather than what to avoid. A prohibition removes an outcome without supplying a replacement.
-- **Give the reason** behind an instruction. The **model generalises from an explanation** to cases the instruction never named.<sup>[3]</sup>
+When an instruction fails, people repeat it in capitals. That names no failing part, and on current models it backfires. Wording meant to stop older models doing too little now makes them do too much. Anthropic's fix is ordinary phrasing.<sup>[4]</sup> Volume was never a technique, and now it costs you.
 
-**The wrong lever, twice over.** When an instruction fails, developers reach for the **firmer restatement**. They take a rule the model did not follow and **say it again in capitals**, naming no failing part of the output. On current models this misfires. Prompts written to stop **older models under-reaching** now cause over-reaching. Anthropic's documented fix is to **dial the aggressive language back** toward ordinary phrasing.<sup>[4]</sup> **Volume was never a technique**. Now it has a cost.
-
-**ELI5.** A rule is only useful if someone can check it. "Be careful" cannot be checked. "Pick one word from this list" can. Shouting a rule louder does not make it clearer. It can make the model do too much.
+**ELI5.** "Be nice" is hard to follow. "Say please and thank you" is easy. Say why, and the helper handles new cases.
 
 ## Delimiters Make Supplied Text Legible as Data
 
-**First, the idea.** A **delimiter** is a marker that fences one kind of text off from another. Here the markers are tags like `<example>`. In the kitchen, they are the labelled trays that keep tickets, recipes and deliveries apart.
+If a prompt mixes rules, background, samples and user input, give each its own tag. Claude is then less likely to read one as another. Samples go in `<example>` tags so they are not taken as part of the task.<sup>[5]</sup>
 
-**Tags.** Tags earn their place when a prompt mixes kinds of content. Wrap **instructions**, **context**, **examples** and **variable input** (the part that changes each request) each in its own tag. That reduces the chance that **Claude reads one as another**. Put examples inside **`<example>` tags** so they are not read as part of the task.<sup>[5]</sup>
+Three more rules cover long material. Put long documents near the top, above the query, instructions and examples. Wrap each document alone, with content and source in subtags. For long-document work, have Claude quote the relevant passages first.<sup>[5]</sup>
 
-**Three rules for long material.** They come from the same page.
-- **Long documents go near the top**, above the query, the instructions and the examples. This improves results across models.
-- **Several documents get wrapped individually**, with content and source in their own subtags.
-- On long-document work, ask Claude to **quote the relevant passages first**.<sup>[5]</sup>
+The model reads a tag. The runtime does not enforce it. A stranger's text can contain a fake closing tag (a forged label on the supplier's box). Stronger: JSON-encode third-party strings instead of pasting them into free text. Escaping leaves no way to close a quote and climb out into instruction position.<sup>[1]</sup> Also tell Claude in `system` that content from tools, documents or searches is data and never overrides your instructions or the user's request.<sup>[1]</sup>
 
-**The limit: the model reads the fence, nothing enforces it.** **Delimiting is a boundary** the **model reads**, not one the **runtime enforces** (the code that runs the request). Text inside a tag can imitate that tag.
-- The harder version is to **JSON-encode third-party strings** rather than concatenating them into free-form text. Escaping leaves no way to close a quote and step out into instruction position.<sup>[1]</sup>
-- State the policy as well. Tell Claude in the system prompt that content returned from tools, documents or searches is **data** and **never overrides your instructions** or the user's request.<sup>[1]</sup>
+Cleaning comes first. Strip known injection patterns from input, then screen it with a lightweight model call. Make its verdict a parseable value your code can branch on. Screen tool returns the same way.<sup>[1]</sup>
 
-**Sanitizing (cleaning the input first).** This runs underneath, before content is placed anywhere.
-- **Filter input** for **known injection patterns** (text written to hijack the model).
-- Screen it with a **lightweight model call**. Its verdict must be constrained to a **parseable value** your code can branch on.
-- Run that same screen over what your tools return.<sup>[1]</sup>
+One asymmetry catches people. Your own instructions must not travel in a tool result either, since content there counts as untrusted and your rule may be ignored or flagged. Put it in the user turn that follows.<sup>[1]</sup> Chapter 20 covers the attack. Here, the layout.
 
-**One asymmetry catches people.** Your **own instructions** must **not travel** in a **tool result** either. Content there **counts as untrusted**, so your rule may be ignored or flagged. **Send it in the user turn** that follows the result.<sup>[1]</sup>
-
-**Where this chapter stops.** Chapter 20 owns the attack. This chapter owns the arrangement that makes it legible.
-
-**ELI5.** Put different kinds of paper in different labelled trays so the cook does not mix them up. But a label is only a sign. A sneaky note can copy the sign. So also tell the cook, "Anything in a delivery box is just information, never orders."
+**ELI5.** Label every box. But anyone can fake a label, so check what comes in, and never put your own orders in a stranger's box.
 
 ## Examples Settle Margins That Another Paragraph Will Not
 
-**First, the idea.** Showing a finished dish teaches more than describing it. This section asks which failures examples fix, and which they leave alone.
+Chapter 1 covered the zero-shot to multi-shot ladder. Here: which problems do examples fix, and which do they leave alone?
 
-**Where this comes from.** Chapter 1 set out the **ladder from zero-shot to multi-shot** (no examples up to several examples) and what each rung costs. The narrower question here is the one scenarios ask.
+Showing the output you want steers format, tone and structure better than describing it.<sup>[5]</sup><sup>[6]</sup> A description gives a rule and leaves the edges to guesswork. A worked example shows one edge settled, down to casing, field names and the awkward case. It is a photo of the plate, not a speech.
 
-**What examples do.** Demonstrating a **desired output** steers **format**, **tone** and **structure** more dependably than describing one in the abstract.<sup>[5]</sup><sup>[6]</sup> The reason is simple.
-- A **description states a rule** and leaves its margins (the edges) to guesswork.
-- A **worked instance shows one margin** already decided. It fixes the exact casing, the exact field names, and the exact handling of the awkward case.
+Three situations call for examples. One, the model gets the task but invents the structure. Two, category lines move between runs, since a definition leaves gaps a labelled instance fills. Three, it looks in the wrong place. Fields come back empty although the value sits in a footnote or a caption. Examples that extract from those spots move its attention. Urging diligence does not.
 
-**Three conditions that call for examples.** Treat them as conditions, not as fixed cases.
-- The **task is understood** and the **structure keeps being invented**.
-- **Category boundaries drift between runs**. A definition leaves edges open that a labelled instance closes.
-- The model is looking in the wrong place. **Fields come back empty** although the value sits in a **footnote** or a **caption**. Demonstrations of extraction from those places move attention where no instruction about diligence does.
+The usual mistake is piling on examples of the case that already works. It feels like effort, so it passes review, but widens the gap. Use inputs that fail.
 
-**The anti-pattern: more examples of the case that already works.** It feels like effort, which is why it survives review. Adding clean examples to a prompt that already handles clean inputs makes the shortfall bigger. Examples have to come from the **population that fails**.
-
-**ELI5.** A photo of the finished plate beats a paragraph describing it. But show photos of the plates that keep going wrong, not the ones the cook already gets right.
+**ELI5.** A photo of the finished plate teaches more than a speech about neatness. Show the tricky plates that go wrong, not more easy ones.
 
 ## An Output Constraint Names a Form, and It Is Still Only a Request
 
-**First, the idea.** An **output constraint** governs shape, independent of content. That means field names, **permitted values**, length, and the **stopping point** saying nothing else may follow. It is the plating spec in the kitchen. Where one is absent, content is often right while form varies enough to break whatever parses it.
+An **output constraint** sets the shape of an answer, whatever the content. It covers field names, permitted values, length, and a stopping point where nothing else may follow. Without one, content may be right while form shifts enough to break your parser.
 
-**Three formatting levers.** Anthropic documents these.
-- Say what the output should be rather than what it should not contain.
-- **Use tags as format indicators**.
-- **Match the style** of your prompt to the style you want back. A prompt's formatting influences the response. Stripping markdown out of a prompt **reduces markdown in the output**.<sup>[4]</sup>
+Anthropic documents three levers. Say what the output should be, not what to leave out. Use tags as format indicators. Match the prompt's style to the reply you want, since formatting rubs off: strip markdown from the prompt and you get less markdown out.<sup>[4]</sup>
 
-**A withdrawn technique: prefill.** Older guidance still shows it. Prefilling the assistant's turn used to be the standard way to force a shape by starting the answer yourself. From **Claude 4.6 onward**, **prefilled responses on the final assistant turn** are unsupported and **return a `400` error**. **Earlier models still accept** them. Assistant messages elsewhere are unaffected.<sup>[7]</sup> A scenario **offering prefill as the fix** on a current model is offering an error.
+Older guides still teach prefilling, which is starting the assistant's answer yourself to force a shape. From **Claude 4.6 onward**, prefilled responses on the final assistant turn are unsupported and return a `400` error. Earlier models still accept them, and assistant messages elsewhere are unaffected.<sup>[7]</sup> So prefill offered as a fix on a current model is an error.
 
-**The ban stated instead of a method.** This owns the section. Examples:
-- **Marking a field non-nullable** (it may never be empty)
-- declaring an empty value unacceptable
-- **retrying until something appears**
+A ban instead of a method is the trap here. Marking a field non-nullable, declaring an empty value unacceptable, retrying until something appears: each removes the honest answer and does nothing for the search. So a missing value becomes an invented one. A rule about form cannot create content that was never generated.
 
-Each removes the honest answer without improving the search that produced it. So an absent value becomes an **invented one**. A constraint on form cannot supply content that was **never generated**.
+A constraint in the prompt is still a request, and the model may miss it on an untested input. Chapter 6 covers the fix: constrain generation against a schema.
 
-**Still only a request.** A **prompt-level constraint** stays a request the model may miss on an untested input. Chapter 6 owns the mechanism that closes that gap by **constraining generation against a schema** (a fixed template for the output).
-
-**ELI5.** A plating spec tells the cook how the plate must look. It cannot make an ingredient appear that was never in the kitchen. If you forbid an empty spot, the cook may just make something up to fill it.
+**ELI5.** You can ask for a box of one size. That fixes the shape, not what goes inside. If the helper cannot find the thing, banning "empty" makes it invent something.
 
 ## Iteration Converges Only When Each Round Carries Evidence
 
-**First, the idea.** Improving a prompt is like fixing a recipe. You taste, find what is wrong, change one thing, and taste again. Guessing in circles does not work.
+A good loop is diagnose, add the one missing piece, measure. A bad loop is re-prompt, re-prompt, re-prompt, while nobody names what broke.
 
-**The loop that works** has three steps: **diagnose**, **add the one missing piece**, **measure**. The loop that fails is re-prompt, re-prompt, re-prompt. The prompt gets longer each time and nobody names what broke.
+Diagnosis is a short lookup from symptom to missing technique.
 
-**Diagnosis is a short lookup**, because the failure identifies the **absent technique**.
-
-| What you observed | What is absent |
+| Symptom | Missing piece |
 |---|---|
-| Right answer, wrong shape, parser breaks | An output constraint naming form and stopping point |
-| Scope drifts and tone moves as the conversation runs on | A standing contract in `system`, stated once and specifically |
-| Task understood, structure invented | Worked examples showing the structure |
-| Clean on tested inputs, broken on a variant | A rule or an example covering that variant |
+| Answer is right but the shape is wrong, so the parser breaks | An output constraint with form and stopping point |
+| Scope and tone wander as the chat goes on | One specific standing contract in `system` |
+| Task is clear but the structure gets invented | Worked examples of the structure |
+| Fine on tested inputs, broken on a variant | A rule or example for that variant |
 
-**Three named failures live in the loop, not in the prompt.**
-- The **rewrite from scratch** throws away every case that already passed. So **nothing accumulates** and nothing converges.
-- The **accreting prompt** adds paragraphs without adding a missing piece. **Length is not free**. A verbose prompt pulls verbose output, which **buys latency and no accuracy**.
-- The **user warned off** ships the defect and asks humans to route around a category that is usually growing.
+Three failures live in the loop itself. Rewriting from scratch discards every case that passed, so nothing builds up. An accreting prompt adds paragraphs but no missing piece, and a wordy prompt pulls wordy output, which costs latency and buys no accuracy. And warning users off ships the defect, asking them to avoid a category that usually keeps growing.
 
-**Feedback must carry evidence.** Otherwise the round is wasted. Useful feedback includes **failing test names**, the inputs, **expected against actual**, and the trace. Unspecific feedback buys unspecific change.
+Feedback needs evidence: failing test names, the inputs, expected against actual, the trace.
 
-**Two outside limits.**
-- Iteration needs something to iterate against. That set has to **hold the inputs that fail**. So real traffic belongs inside the loop, not a clean development set standing in for it. **Messy traffic needs rules** of its own. For example: how to behave when the **source omits a mandatory field**, how to **resolve two passages that disagree**, how to answer an **out-of-scope request**. Chapter 19 owns running that measurement as a discipline.
-- Know when to stop. Anthropic says plainly that **not every failing evaluation** is best solved by prompting. It names latency and cost as examples a **different model choice** may settle more easily.<sup>[8]</sup> Chapter 4 owns that call. A scenario whose constraint is money or milliseconds is **not a prompting question in disguise**.
+Two outside limits apply. First, the set you iterate against must hold the inputs that fail, so real traffic belongs in the loop, not a tidy development set. Messy traffic needs rules too. What if the source skips a mandatory field? What if two passages disagree? What about an out-of-scope request? Chapter 19 covers running that measurement as a habit.
 
-**ELI5.** To fix a recipe, taste it, work out what is missing, add that one thing, and taste again. Do not throw the whole recipe away every time. And if the real problem is the stove is too slow, no recipe change will fix it.
+The other limit is knowing when to stop. Anthropic says prompting is not the best fix for every failing evaluation. For latency and cost, a different model may be easier.<sup>[8]</sup> Chapter 4 covers that call. If the real problem is money or milliseconds, prompting is the wrong tool.
+
+**ELI5.** If the soup tastes off, find out why. Add the one missing thing and taste again. Do not tip out the pot.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers here **describe real practice**. Somebody has genuinely done every one of them, often to a prompt that **improved afterwards**. **Four assumptions** produce most of them.
+Wrong answers here are things people really do. Four assumptions produce most.
 
-**The four wrong assumptions:**
-- **Willingness assumed where specification is missing.** The option **repeats an instruction**, **intensifies** it, or asserts that the **output is unacceptable**. All three read the gap as reluctance. But the **model complied** with what it was given. So the **useful move names the piece** nobody supplied.
-- **A prohibition offered where a method is needed.** Examples are **forbidding an empty field**, **banning a value**, and **retrying until something arrives**. Each removes an outcome and supplies no route to a better one. They turn correct only where the scenario states the **model already holds the information**.
-- **The failing population kept outside the loop.** Examples are **more examples from the clean set**, a **wider output cap**, or a **different sampling setting**. Each optimises the distribution that was already working.
-- **A standing rule given a per-request home.** Examples are **restating the contract in every turn**, **duplicating it in both places**, or **leaving each instruction** where it was first typed. **Copies drift**, and your rules end up in the channel carrying **supplied content**.
+- **Blaming willingness for a missing spec.** Repeat it, shout it, or call the output unacceptable. All three treat a gap as reluctance. The model did what it was told, so name the missing piece.
+- **A ban where a method is needed.** Forbid an empty field, ban a value, retry until something shows up. None offers a route to a better answer. They fit only when the model already holds the information.
+- **Failing inputs left out of the loop.** More clean examples, a wider output cap, a new sampling setting. All tune inputs that already work.
+- **A standing rule given a per-request home.** Repeat the contract each turn, copy it to both places, or leave each instruction where it was first typed. Copies drift, and rules land beside supplied content.
 
-| When the scenario says | The answer is usually | The trap is usually |
+| Scenario | Usual answer | Usual trap |
 |---|---|---|
-| Instructions sit in both the system prompt and the turns, and the format varies | Standing behaviour and the output contract consolidated in `system`, once | Restating the contract every request, or holding it in both places |
-| A supplied document must be analysed under persistent rules | Rules in `system`; document in the turn, delimited from the request | Concatenating document text into the standing instructions |
-| The task is right and the structure keeps being invented | Worked examples showing the exact shape | A longer description, or a firmer request for the same shape |
-| Fields come back empty although the material holds them somewhere unusual | Examples demonstrating extraction from those locations | Forbidding the empty value, or retrying until one appears |
-| Good scores in development, poor behaviour on live traffic | Failing inputs added to the measured set, plus rules for degenerate ones | More examples from the clean set, or more output room |
-| One call reads, extracts, judges and summarises, and quality is uneven by part | Focused calls in sequence, each fed the previous step's structured output | Urging thoroughness, a bigger cap, or a temperature change |
-| Repeated fixes keep lengthening the prompt without fixing it | Name the failure, add the single missing technique, measure | Rewriting from scratch, or relaxing the check that reports it |
+| Rules sit in both system prompt and turns, and format varies | Behaviour and output contract in `system`, once | Repeat the contract each request, or keep both copies |
+| A supplied document is analysed under lasting rules | Rules in `system`, document in the turn, kept apart from the request | Pasting the document into the standing rules |
+| Task is right but structure keeps being invented | Examples of the exact shape | A longer description or a firmer ask |
+| Fields come back empty though the data is somewhere odd | Examples that extract from those places | Banning the empty value, or retrying |
+| Good in development, poor on live traffic | Failing inputs in the measured set, with rules for odd ones | More clean examples, or more output room |
+| One call reads, extracts, judges and summarises, unevenly | A chain of focused calls, each fed the last step's structured output | Urging care, a bigger cap, or a new temperature |
+| Fix after fix makes the prompt longer and no better | Name the failure, add one missing technique, measure | Start over, or loosen the check that reports it |
 
-**A habit that works past the table.** For any option that changes a prompt, say which **piece it adds** and which **destination** it puts that piece in.
-- An option **adding no piece** is **restating**.
-- An option **adding a piece** to the **wrong destination** reads best and ages worst.
+Use this habit on any option. Ask what piece it adds and where it puts that piece. No new piece means it is only restating. A piece in the wrong place looks fine today and fails later.
 
-**ELI5.** Most wrong answers either say the same thing louder, ban something without giving a way to do better, practise on easy cases, or scribble the house rules on every ticket. The right answer finds the one missing piece and puts it in the right place.
+**ELI5.** Wrong answers sound like what a busy person would do: shout, ban, add easy stuff. Ask what new thing an answer adds, and where.
 
 ## What to Remember
 
-- **Placement sorts** by **two questions**: how **long the text applies**, and who could have written it. **Lifetime decides duplication**. **Authorship** decides whether it may **instruct**.
-- **Three destinations**, never two. **Persistent rules** go in **top-level `system`**. This request's question and the user's **own material** go in the turn. **Third-party content** goes in **`tool_result` blocks**. **Nothing you did not write** reaches the first.
-- A **mid-conversation system message** carries the **same authority** as the **`system` field**. It **cannot be first** and it appends at the end. So it adds a **late rule** without **invalidating a cached prefix**.
-- An instruction is **checkable** when **output can be tested** against it: **named permitted values**, a **stated ceiling**, a **rule for conflicting sources**. Anthropic's test is whether a **human with minimal context** could follow it unconfused.
-- **Say what to do** rather than what to **avoid**, and **give the reason**, because the **model generalises** from an **explanation** to cases the **instruction never named**. **Restating a rule more firmly** names no failing part, and **aggressive phrasing** now causes **over-triggering**.
-- **Tags separate instructions**, **context**, **examples** and **input** so none is **read as another**. **Long documents** sit near the top, above **query**, **instructions** and **examples**.
-- **Delimiting is a boundary** the model reads, not one the **runtime enforces**. **JSON-encode untrusted strings**. **State in `system`** that **supplied content never overrides** instructions. Screen input and tool output with a **lightweight classifier** first. Your **own instructions** never travel in a **tool result**, since **content there counts as untrusted**.
-- **Examples repair invented structure** and open category boundaries. They **change where the model looks** when **values sit** in **footnotes**, **captions** or **covering letters**. They must come from the **population that fails**.
-- An output constraint governs form independent of content: **field names**, **permitted values**, **length**, and a **stopping point**. **Prefilling the final assistant turn** returns a **`400` error** on **Claude 4.6** and later.
-- **Forbidding an empty value** supplies no method, so the **missing answer** becomes an **invented one**. **Shape constraints** cannot **generate content** that was never produced.
-- **Diagnose before re-prompting.** **Wrong shape** wants a **constraint**. **Drifting scope** wants a **specific system prompt**. **Invented structure** wants **examples**. A **broken variant** wants a rule covering it.
-- **Iteration converges** on specific evidence: **failing cases**, **inputs**, **expected against actual**. **Rewriting from scratch** discards what passed, and a **prompt that only grows** is a skipped diagnosis.
-- The measured set must hold the **inputs that fail**. Messy traffic needs its own rules: **omitted mandatory fields**, **passages that disagree**, **requests outside the defined scope**.
-- **Not every failing evaluation** is a **prompting problem**. Anthropic names **latency** and **cost** as constraints a **different model choice** may settle **more easily**.
+- Placement sorts by two questions: how long the text applies, and who could have written it. Lifetime decides copies. Authorship decides who may instruct.
+- Three homes, never two. Persistent rules go in top-level `system`. This request's question and the user's own material go in the turn. Third-party content goes in `tool_result` blocks. Nothing you did not write reaches the first.
+- A mid-conversation system message has the same authority as `system`, cannot come first, and goes at the end. It adds a late rule and keeps a cached prefix valid.
+- An instruction is checkable when output can be tested against it: named permitted values, a stated ceiling, a rule for conflicting sources. Anthropic's test: could a human with minimal context follow it unconfused?
+- Say what to do, not what to avoid, and give the reason, because the model generalises from a reason to cases you never named. Saying a rule more firmly names no failing part, and aggressive phrasing now causes over-triggering.
+- Tags keep instructions, context, examples and input from being read as each other. Long documents go near the top, above the query, instructions and examples.
+- Delimiting is a boundary the model reads, not one the runtime enforces. JSON-encode untrusted strings, say in `system` that supplied content never overrides instructions, and screen input and tool output with a lightweight classifier first. Your own instructions never ride in a tool result, since content there counts as untrusted.
+- Examples fix invented structure and blurry category edges. They also change where the model looks when values sit in footnotes, captions or covering letters. Draw them from the inputs that fail.
+- An output constraint sets form, whatever the content: field names, permitted values, length, and a stopping point. Prefilling the final assistant turn returns a `400` error on Claude 4.6 and later.
+- Forbidding an empty value gives no method, so a missing answer becomes an invented one. Shape constraints cannot create content that was never produced.
+- Diagnose before re-prompting. Wrong shape wants a constraint, drifting scope a specific system prompt, invented structure examples, a broken variant a rule covering it.
+- Iteration converges on specific evidence: failing cases, inputs, expected against actual. Rewriting from scratch loses what passed, and a prompt that only grows skipped the diagnosis.
+- The measured set must hold the inputs that fail. Messy traffic needs its own rules for omitted mandatory fields, passages that disagree, and requests outside the defined scope.
+- Not every failing evaluation is a prompting problem. Anthropic names latency and cost as limits a different model choice may settle more easily.
 
-**ELI5.** Put the house rules on the kitchen wall, once. Keep today's order on the ticket. Leave strangers' notes in their boxes. Write rules you can check, show photos of the plates that go wrong, and fix recipes one tasted change at a time.
+**ELI5.** Rules on the wall, the order on the ticket, strangers' boxes checked. Ask for things you can test. Find what is missing instead of shouting.
 
 ## Endnotes for this chapter
 

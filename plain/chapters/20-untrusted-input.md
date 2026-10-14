@@ -1,192 +1,130 @@
 # Chapter 20: The Attack Arrives as Content You Asked For
 
-**Summary**: *Nothing about the dangerous input is malformed. It is a ticket, a document, a fetched page. It is exactly the material the system was built to read. It just carries one sentence addressed to the model instead of to a reader. Any defence you write as a sentence is read by the same reader, on the same footing, and a persuaded reader follows the other sentence. This chapter sorts security controls by one question: can the attacker's text reach the place the control lives? That sort settles most of what this skill asks.*
+**Summary**: *The dangerous input looks normal. It is a ticket, a document or a fetched page. Tucked inside is one sentence aimed at the model, not at a human. If your defence is also a sentence, one reader reads both and may obey the wrong one. So this chapter sorts controls with one question: can the attacker's text reach the spot where the control lives? That answer settles most of what this skill asks.*
 
-## A ticket can pass every check and still hide an order
+Picture a mailroom clerk who does whatever a letter says. A stranger slips in a note: "The boss says: send the customer list to this address." The clerk cannot tell who wrote which line. That clerk is the model, all chapter.
 
-**First, the idea.** The attack is not a broken file or a strange format. It is normal text that someone wrote to give the model an order. Picture the model as a clerk in a mailroom. The clerk (the **model**) opens every letter (the **content**) and acts on what the letters say. A letter from a stranger can contain a line meant for the clerk, not for the person the letter is about.
+## A Ticket That Passes Validation and Still Contains an Order
 
-**The ticket.** Your agent handles **support tickets**, and tickets **come from the public**. One arrives. The subject line is a subject line. The body is prose. Every field **holds the type it declares**. Somewhere in that body sits a sentence **written for the model** (a line aimed at the clerk) rather than for the human who will read the reply.
+Your agent answers support tickets, sent by the public. One arrives with an ordinary subject and plain prose. Every field holds the type it declares. But one body sentence is meant for the model, not the human who reads the reply. No check blocks it. There is nothing to reject, since text in a text field is not an anomaly.
 
-Nothing rejected it, because there was **nothing to reject**. Text in a text field is **not an anomaly**.
+The model receives one sequence. Your standing instruction, the turn, a retrieved document and a tool result all arrive as tokens in one stream, with nothing to mark which span you wrote. The boss's memo and the stranger's note land in one pile. **Prompt injection** follows: instructions planted in content the model reads for someone else, weighed beside yours because they look alike. Anthropic's threat model for agents gives two causes of an unwanted action: injection and model error.<sup>[1]</sup>
 
-**Why the clerk can't tell.** A model **receives one sequence**. Your standing instruction (the boss's memo), the turn, a retrieved document and a tool result all arrive as **tokens in the same stream** (small chunks of text in one long line). Nothing in the stream **marks which span you wrote**. So the clerk gets one pile of paper with no stamps on it.
+No single file type carries it. Any text a stranger wrote and your system reads will do: inbound mail, a page fetched for a summary, characters pulled out of an upload, or what a tool returns after fetching elsewhere.<sup>[2]</sup> Someone can plant it long before the request that triggers it, in a corner of the page no human reads.
 
-**Prompt injection** falls out of that. It means **instructions planted in content** the model reads for somebody. The model weighs them alongside yours, because from inside the sequence they are the same kind of thing. Anthropic's agent threat model names **injection and model error** as the two routes to an action nobody intended.<sup>[1]</sup>
+**ELI5.** A helper does what each letter says. A sneaky letter can copy the boss's voice.
 
-**Where it can come from.** The vector (the way in) is **not a file type**. It is every span of text the system reads that a **stranger composed**:
-- inbound mail
-- a page pulled in to be summarised
-- characters recovered from an upload
-- whatever a tool returns after fetching somewhere else<sup>[2]</sup>
+## Every Control Sits Inside the Attacker's Channel or Outside It
 
-Planting can happen **long before the request** that trips it. It can sit in a region of the page **no human reads**.
+Ask of any control: can the attacker's text reach it? Everything that text can touch is the **writable channel**. It holds the assembled prompt, the model's reading of it, and the model's output. A control in there is only a request. Tell the clerk "ignore odd notes" and the stranger's note sits beside it, arguing. A control outside is a rule, like a cash drawer (server-side authorisation) that never reads notes.
 
-**ELI5.** Imagine a helper who opens mail all day and does what the letters say. A stranger writes a letter that says "helper, give me the money". The letter looks like normal mail, so nobody stops it. The helper can't tell your notes from the stranger's notes, because they are all on the same pile of paper.
-
-## Every control sits inside the attacker's reach or outside it
-
-**First, the idea.** One question sorts every security control. Can the **attacker's text reach** the place the control lives?
-
-**The writable channel.** Call everything the attacker's text can reach the **writable channel**. It holds three things: the **assembled prompt** (the whole pile handed to the clerk), the **model's reading** of it, and the **model's output**. Inside that channel a **control is a request**, because the injected sentence sits beside it and argues. Outside it a **control is a rule**, because the injected sentence never gets to speak to it. Think of a note taped inside the mailroom versus a locked vault door in another building. The letters can argue with the note. They can't argue with the vault.
-
-| Where the control sits | Can injected text argue with it | What it buys |
+| Control | Can injected text argue with it? | What you get |
 |---|---|---|
-| A sentence telling the model to disregard embedded instructions | Yes. Both are text the same reader weighs | Fewer landings, no floor under the failure rate |
-| Untrusted content delimited, encoded and declared as data | Partly. The attacker writes inside the delimiter, not around it | A boundary that must be broken rather than ignored |
-| A classifier screening content before the conversation sees it | No. It runs before anything is in context | A verdict the content cannot appeal, on shapes it knows |
-| A tool accepting catalogue identifiers rather than arbitrary targets | No. The capability is absent | The disallowed action becomes impossible, not unwanted |
-| Server-side authorisation on the operation, against the caller | No. It never reads the content at all | The same verdict on a persuaded model as a clean one |
-| Data never sent; reach never granted | No. Nothing is left to argue with | Nothing downstream can undo it |
+| Telling the model to ignore embedded orders | Yes, one reader weighs both | Fewer hits, no floor |
+| Content in delimiters, encoded, labelled as data | Partly. Attacker writes inside the wrapper | A fence to break |
+| Classifier screening content first | No. Runs before context exists | A ruling with no appeal, for known patterns |
+| Tool that takes catalogue identifiers only | No. The ability is absent | The banned action cannot happen |
+| Server checks the caller may do the operation | No. Never reads content | Same answer for a fooled model and a clean one |
+| You never send the data or grant the reach | No. Nothing is left to argue with | Nothing later can undo it |
 
-**What changes down the middle column.** One property changes: whether the control can be **talked out of its verdict**. A probabilistic control (one that works most of the time, not every time) has **no floor**. Claude is trained to resist these attacks, and Anthropic still recommends **defence in depth** (several layers, so one failure is not the end).<sup>[1]</sup> That is the honest reading of every row above the last two.
+Down the middle column, one thing changes: can the control be talked out of its verdict? A control that works by odds has no floor. Claude is trained to resist these attacks, yet Anthropic still recommends defence in depth.<sup>[1]</sup> Read every row but the last two that way.
 
-**The anti-pattern.** The **defence written as a sentence** is the anti-pattern. It costs nothing and **reads like policy**. It is not what stands between a hostile ticket and a refund.
+Writing the defence as a sentence is the anti-pattern. It is free and sounds official, yet a hostile ticket can still get a refund through it.
 
-**What a model adds to a threat model.** The same sort says what is new. Flooding, physical access and a vulnerable client library are **conventional risks** a review already carries. The additions exist because untrusted text gets interpreted and the interpretation reaches privileged actions. There are four:
-- **injection**
-- **leakage of prompt or context content**
-- **jailbreak attempts**
-- **output that reaches an action path** without passing an application control
+This sort also shows what a model adds to your risk list. Reviews already count conventional risks such as flooding, physical access and a vulnerable client library. New ones arise because untrusted text gets interpreted and the result reaches privileged actions: injection, leakage of prompt or context content, **jailbreak** attempts, and output that reaches an action path without passing an application control.
 
-**ELI5.** A sticky note saying "ignore strange orders" is read by the same helper the strange order is aimed at. So a clever letter can talk the helper out of it. A locked vault never reads the letters, so nothing a letter says can open it. Trust the vault, not the note.
+**ELI5.** A note saying "ignore other notes" is just another note. A locked drawer reads none and needs the right key.
 
-## A jailbreak attacks the model's limits; an injection attacks your application's actions
+## A Jailbreak Attacks the Model's Limits; an Injection Attacks Your Application's Actions
 
-**First, the idea.** These are **two threat models**, not two names for one thing. The difference is who is **hostile**.<sup>[2]</sup>
+These are two threat models, split by who is hostile.<sup>[2]</sup>
 
-**Jailbreak.** The **human using your application** is the **attacker**. They shape their input until it produces content, or takes an action, that you would refuse. In mailroom terms, the customer at the counter is the one trying to trick the clerk.
+In a jailbreak, your own user is the attacker. They reshape input until it yields content or an action you would refuse. In an injection, that user is the victim. A third party wrote what Claude read for them.<sup>[2]</sup> The customer is innocent. The note is the culprit.
 
-**Injection.** That **person is the victim**, and the **attacker wrote** the content Claude read for them.<sup>[2]</sup> Here the customer is innocent. The stranger who wrote the letter is the one doing harm.
+So the cures differ. A jailbreak has an account to act on: screen input before the main conversation sees it, and throttle or ban repeat offenders of the same refusal.<sup>[2]</sup> An injection has no one to throttle.
 
-**Which fix applies.** That decides which remedies exist.
-- Against a jailbreak there is an **account to act** on. You can **screen input** before the main conversation sees it. You can **throttle or ban** somebody who keeps triggering the same refusal.<sup>[2]</sup>
-- Against an injection there is **nobody to throttle**. The requester is innocent and the **document is the attacker**.
+Defend in two halves either way. Limit what reaches the model, then limit its actions. Skip the second and a steered model keeps all its permissions.
 
-**What stays the same.** The defensive shape is identical either way. **Constrain what reaches the model**, then constrain what it may do about it. Defend only the first half and a steered model **keeps every permission** it started with.
+**ELI5.** Sometimes the person at the counter is bad. Sometimes a bad letter fooled a good person. Filter what comes in and limit the helper.
 
-**ELI5.** In one story the person at the counter is the trickster, so you can send them away. In the other story the person at the counter is fine, and a stranger's letter is the trickster. You can't send a letter away from the counter. So in both stories you do two things. You check what gets handed to the helper, and you limit what the helper is allowed to do.
+## Untrusted Content Enters as Data, in Its Own Block, After a Gate
 
-## Untrusted content goes in as data, in its own block, after a gate
+Three moves, each further from the attacker's channel than the last.
 
-**First, the idea.** There are **three moves**. Each one sits further outside the **writable channel** than the last.
+Screen first. Any check that runs before the prompt is built is outside the channel. Anthropic documents a lightweight model that pre-screens input, with structured outputs forcing its verdict into a value your code can branch on. Tool output gets the same pattern: run the tool, screen the result, pass it on only if nothing is flagged.<sup>[2]</sup>
 
-**Move 1: screen it before assembly.** A check that runs before the prompt is built is **outside the channel** by construction. It is like a person who opens the sack at the door, before the clerk sees anything. Anthropic documents a **lightweight model pre-screening input** (a small, cheap model that looks first). **Structured outputs** pin the verdict to a value the application can branch on. The same pattern works over tool output: run the tool, screen what came back, and pass it on only if the screen reports nothing.<sup>[2]</sup>
+Hand it over as data, with its source named. Put outsider text in tool result blocks, never in a system prompt or plain user text block. Claude is trained to doubt orders that appear inside tool results.<sup>[2]</sup> Encode it as JSON so escaping marks the edge. A closing quote or tag then cannot break out into instruction context.<sup>[2]</sup> Name the content and its source too, in the tool description or the result structure.<sup>[2]</sup>
 
-**Move 2: deliver it as data with its origin declared.**
-- Third-party content **belongs in tool result blocks**, not in a system prompt or a plain user text block. The reason is that Claude is trained to treat directives arriving in a tool result sceptically.<sup>[2]</sup>
-- **Encoding it as JSON** makes **escaping the boundary** instead of punctuation. So a closing quote or tag cannot break out into instruction context.<sup>[2]</sup>
-- Say what the content is and where it came from, in the tool description or the result structure.<sup>[2]</sup>
+Two facts place a span: how long it lives and who wrote it. Lasting text you wrote is standing instruction. Outside text arriving with this one request goes in the turn, behind delimiters. The rule cuts both ways, and people miss that. Put an instruction of your own inside a tool result and the model treats it as untrusted. It may ignore it or flag it as an attack. Send it in a user turn after the block.<sup>[2]</sup>
 
-**Move 3: put each span where it belongs.** **Two properties** decide where a span belongs: how long it lives, and who wrote it.
-- **Long-lived material you authored** is the **standing instruction's job** (the boss's memo).
-- Anything arriving with this one request, from outside, sits in the turn behind delimiters (in its own labelled tray).
+The worst habit is the concatenated prompt: instruction and document pasted into one string. That erases the line later steps need. Parsing afterwards fixes a result's shape, not the boundary. Chapter 5 covers placement as prompt craft.
 
-That classification runs both ways, and this is the part people miss. An instruction of your own **placed inside a tool result** is content the model **treats as untrusted**. So it may be disregarded, or read as the attack. It belongs in a **user turn after the block**.<sup>[2]</sup>
+**ELI5.** Do not staple the stranger's letter to the boss's memo. Check it at the door and give it its own tray.
 
-**The anti-pattern: the concatenated prompt.** This means instruction and document **joined into one string** before anything else runs. It **erases the distinction** the rest of the defence needs. Parsing defensively afterwards **repairs a result's shape** rather than restoring a boundary. Chapter 5 covers placement as prompt craft.
+## The Only Leak Control Nothing Downstream Can Undo Is Not Sending the Data
 
-**ELI5.** First, someone checks the sack of mail at the door. Then the letters go into their own tray, labelled with who sent them, so the helper knows they are letters and not the boss's orders. The boss's own orders never go inside the tray, because anything in the tray is treated as suspicious. And you never glue the boss's memo and a stranger's letter into one page.
+Leak controls sort the same way, by what has already happened when each runs.
 
-## The only leak control nothing downstream can undo is not sending the data
+Redaction, access restriction and periodic review all work on data that exists, so they are recoveries. **Minimisation** acts earlier, before a second copy exists. Send only the fields the task needs. A field you never sent cannot leak.
 
-**First, the idea.** Leaks need sorting too. Sort **leakage controls** the same way, by what has **already happened** when they run.
+Two failures earn names. One is the debug log nobody scoped. It keeps raw requests and responses for troubleshooting, so it becomes a second copy of everything sensitive, kept longer and readable by more people. Tokenising identifiers before the write and limiting who reads the store help. Both still follow a request that carried the identifiers. The other is redaction delegated to the model. Privacy then rests on a step with no floor, run after the data has crossed. An unguessable storage path is obscurity, not a third option. Whoever learns the path reads the store. Obscurity expires on discovery.
 
-**Recovery versus prevention.** **Redaction, access restriction and periodic review** act on data that exists. That makes them recoveries. **Minimisation acts** before the data exists anywhere else. Send the fields the task needs and no others. A record **never transmitted cannot leak**. If a letter never goes in the sack, nobody can read it in the mailroom.
+The fix is a boundary with a stated crossing rule: what may leave, and what is filtered or redacted at the line. Decide it before the call, not after incidents. Chapter 16 covers that boundary as a design object.
 
-**Failures that earn names.** Two failures earn names:
-- The **debug log nobody scoped**. It keeps **raw requests and responses** for troubleshooting and becomes a **second copy** of everything sensitive. It is held longer than the first copy and readable by more humans. **Tokenising identifiers** (swapping real IDs for stand-ins) before the write, and restricting who reads the store, are the repairs. Both sit downstream of a request that carried the identifiers anyway.
-- **Redaction delegated to the model**. This makes a privacy guarantee depend on a step with **no floor**, acting after the data has crossed.
+Protected health information (PHI) in the Claude API appears in message content, attached files, and file names and metadata. Under a BAA, workspace names, user contact details, billing data and support tickets should not hold it.<sup>[3]</sup> One route is easy to miss, the schema. With structured outputs or strict tools, JSON schemas compile into grammars cached separately from message content. Those caches lack the same protections. Keep identifying detail out of property names, enum values, const values and pattern regexes.<sup>[3]</sup>
 
-An **unguessable storage path is obscurity**, not a third option. Anyone who learns the path reads the store. Obscurity **expires on discovery**.
+Retention and residency are settings, not prompts. With zero data retention, Anthropic does not store prompts or responses at rest once the response returns. You enable it per organisation. **HIPAA readiness** instead applies safeguards across the whole lifecycle, without deleting at once. A team handling PHI wants that, not ZDR.<sup>[3]</sup> Residency has two separate settings. One sets where inference runs. The other sets where data is stored.<sup>[4]</sup> For a prompt leak, first keep proprietary detail the task does not need out of the prompt.<sup>[5]</sup>
 
-**What replaces all of it.** A **boundary with a stated crossing rule**: what may leave, and what gets filtered or redacted at the line. It is **decided before the call** rather than discovered from incidents. Chapter 16 treats that boundary as a design object.
+**ELI5.** A secret you never told cannot be spilled. Hiding it later only helps after the telling.
 
-**Health data and schemas.** Two specifics are worth carrying.
-- **Protected health information** (PHI) in the Claude API turns up in **message content**, in **attached files**, and in **file names and metadata**. Workspace names, user contact details, billing data and support tickets are not expected to carry it under a BAA.<sup>[3]</sup>
-- One route around that is easy to miss: the leak goes out through the schema. With structured outputs or strict tools, **JSON schemas compile into grammars cached separately** from message content. Those caches do not get the same protections. So keep identifying detail out of **property names**, **enum values**, **const values** and **pattern regexes**.<sup>[3]</sup>
+## Authorisation Belongs to the Operation and Is Checked Against the Caller
 
-**Retention and residency.** These are configuration rather than prompting.
-- **Zero data retention** (ZDR) means prompts and responses are **not stored at rest** once the response returns. It is **enabled per organisation**.
-- **HIPAA readiness applies safeguards** across the whole lifecycle instead of immediate deletion. An organisation handling PHI wants that rather than ZDR.<sup>[3]</sup>
-- Residency (where data lives) is **two independent settings**: where **inference runs**, and where **data is stored**.<sup>[4]</sup>
+A tool call is a request, not proof you may have it. The check that holds runs on the server, at the operation, against the calling identity. Does the caller own the record? Is the amount in policy? Does the role allow it? It never reads the ticket, so a persuaded model gets the same ruling as a clean one. Any check that reads the request lives in the channel. Summarising first does not remove the hostile line. It carries it into the summary, and the summariser can be steered too. A cheaper model fails too, because any model follows instructions.
 
-**Leaking the prompt itself.** A prompt leak runs the other way. The first recommendation there is to leave proprietary detail the task does not need out of the prompt.<sup>[5]</sup>
+Authentication comes first. If a lookup finds several plausible matches, the identity is unresolved. One disambiguating question fixes it. Picking the latest is still a guess, just with a cutoff. Opening each candidate's records to compare is worse. It exposes an account just to learn it was wrong.
 
-**ELI5.** The safest secret is the one you never put in the mailbag. Blacking out words later, locking the filing cabinet, or checking the cabinet now and then all help. But they only work on papers that already exist. So send only what the job needs. And a hidden address is not a lock, because once someone finds it, the door is open.
+**Least privilege** then sets severity, not likelihood. An injection through an identity that can write anywhere is an incident. If that identity may write to one directory, the same attempt is a refusal plus an audit line. A tool taking an identifier checked against an approved catalogue cannot fetch an arbitrary target. A general fetch tool plus a warning leaves the power in place and hopes. Filtering results afterwards is too late, since the page is fetched and the answer shaped.
 
-## Authorisation belongs to the operation and is checked against the caller
+Two containment controls matter here. First, network egress restriction blocks the outbound request itself. If a malicious file tells an agent to send customer data out, the network stops it.<sup>[1]</sup> A sandbox with no egress rules lets a compromised tool execution reach arbitrary hosts.<sup>[6]</sup> Second, **default deny**. Claude Code matches bash commands fail-closed, so a command with no match needs approval. Web fetch gets its own context window, so retrieved content never reaches the main one.<sup>[7]</sup> Chapter 21 covers hooks as the enforcement point. Chapter 22 covers credentials.
 
-**First, the idea.** A **tool call** is a **request**. It is never an **entitlement**. That distinction is the whole of authorisation. When the clerk asks the vault for money, the vault guard doesn't ask what the clerk was told. The guard checks who is asking and what they are allowed to take.
+**ELI5.** A cash drawer asks "who are you, and may you?" It ignores how nice the note sounds. Give each worker only needed keys.
 
-**The check that holds.** It **runs server-side on the operation** (at the vault, not in the mailroom), against the **identity doing the calling**. It asks:
-- does this caller own the record?
-- is the amount inside policy?
-- is the action permitted for the role?
+## How Wrong Answers Are Built on This Material
 
-It gives the **same verdict on a persuaded model** as on a clean one, because it **never reads the ticket**.
+Wrong options here are sound practice in the wrong place. Each fits another threat, or a later step.
 
-**Checks that don't hold.** Everything that inspects the request instead **sits in the channel**. **Summarising first** does not strip the hostile line out. It **relocates the line into the summary**, and the summarising call is one more thing to steer. A cheaper model is not a boundary either, since following instructions is what a model is for.
+- A control inside the attacker's reach. A louder instruction, a stricter refusal policy, a reminder that documents are untrusted. Text against text is a mitigation, never a boundary. It answers how often an attempt lands.
+- Detection where prevention was possible. Logging and review, output filters, anomaly alerts. Each watches what already happened, and several add another copy of the data. Use them after you accept the exposure and need evidence.
+- The model guarding itself. Ask it if content is trustworthy and containment goes to a reader the content already addresses. Ask it to omit sensitive fields and privacy goes the same way.
+- A power left in place, with advice against using it. The broad tool stays. A warning, a preference or a later filter sits around it. Fine only if the need is real.
 
-**Authentication comes first.** **Identity has to be settled** before any operation that depends on it.
-- A lookup returning **several plausible matches** is an **unresolved identity**. **One disambiguating question** is the remedy.
-- **Ranking by recency** is the same guess with a threshold on it.
-- Probing each candidate's records to work out which is which discloses one account's detail in the act of deciding it was the wrong account.
-
-**Least privilege decides severity.** **Least privilege** (giving an identity only what it needs) decides how bad it gets, not how likely it is.
-- An injection through an **identity that can write anywhere** is an **incident**.
-- Give that identity **one writable directory** and the identical attempt ends as a **refusal plus an audit line**.
-
-**The tool surface follows the same rule.**
-- A tool taking an **identifier validated against an approved catalogue** cannot fetch an arbitrary target.
-- A general fetch tool plus a warning leaves the capability sitting there and relies on the model declining.
-- Filtering results afterwards is later still. The page was already retrieved, and the answer it produced is already shaped by material nobody approved.
-
-**Two containment controls** earn their names.
-- **Network egress restriction stops the outbound request** itself. That is why an agent told by a malicious file to send customer data outward is blocked at the network rather than at the prompt.<sup>[1]</sup> A sandbox with no egress rules lets a compromised tool execution reach arbitrary hosts.<sup>[6]</sup>
-- **Default deny** is the other. Claude Code **matches bash commands fail-closed**, so an **unmatched command needs approval**. **Web fetch gets its own context window**, so retrieved content never lands in the main one.<sup>[7]</sup>
-
-Chapter 21 covers hooks as the enforcement point and chapter 22 the credentials.
-
-**ELI5.** When the helper asks the vault for money, the guard checks who the helper is and what the helper is allowed to take. The guard never reads the letter, so no letter can sweet-talk the guard. If you're not sure who is asking, ask one clear question. And give each helper keys to only one small room, so a trick can't open much.
-
-## How wrong answers are built on this material
-
-**First, the idea.** Wrong answers here describe **real security work**. Most are controls that would be right against a **different threat**, or right **one step later** than the scenario needs.
-
-**Four kinds of wrong answer:**
-- **A control placed where the attacker writes.** Examples are a **stronger instruction**, a **firmer refusal policy**, or a reminder that documents are untrusted. **Text competing with text** is a **mitigation, never a boundary**. It is right when the question is how often an **attempt lands**.
-- **Detection offered where prevention was available.** Examples are **logging and reviewing**, **filtering output**, and **alerting on anomalies**. All of these **observe an event that has happened**, and several create a fresh copy of what is being protected. They are right once the **exposure is accepted** and evidence is what is wanted.
-- **The model made part of its own containment.** Asking it to **judge whether content is trustworthy** hands **containment to a reader** the content is already talking to. Asking it to **leave sensitive fields** out does the same to **privacy**.
-- **A capability left in place and discouraged.** The **broad tool stays**, and a **warning**, a **preference** or a **later filter** goes around it. This is right only where the **capability is genuinely needed**.
-
-| When the scenario says | The answer is usually | The trap is usually |
+| Scenario | Usual answer | Usual trap |
 |---|---|---|
-| Content written by outsiders is read, and a privileged action exists | Authorise the operation server-side against the caller | A prompt instruction, a summarisation pass, or a smaller model as a filter |
-| A general-purpose tool is being used beyond its intended scope | Replace it with one taking validated identifiers | A warning in the prompt, or filtering results after the fetch |
-| Identifying data is being written to logs for debugging | Send less in the first place, and redact before the write | Retaining raw payloads, or asking the model to omit identifiers |
-| Untrusted text must not be read as instruction | Screen it, then deliver it delimited inside a tool result | Concatenating it with the instruction, or putting it where standing instructions live |
-| A lookup returns more than one matching identity | Treat identity as unresolved and ask one distinguishing question | Ranking by recency, or reading each candidate's records to decide |
-| A regulatory constraint is stated alongside a delivery deadline | Treat the constraint as fixed and choose inside what it leaves | Weighing it against speed as one factor among several |
-| Model-specific threat categories are asked for | Injection, context leakage, jailbreak, unsafe output reaching an action | Restating conventional infrastructure or supply-chain risks |
+| Strangers write text the agent reads, plus a privileged action exists | Server authorises against the caller | Prompt instruction, summarising step, smaller model as filter |
+| A general tool is stretched past its job | Swap in a tool taking validated identifiers | Prompt warning, or filtering after the fetch |
+| Debug logs capture identifying data | Send less, redact before writing | Keep raw payloads, or tell the model to omit identifiers |
+| Untrusted text must not act as an order | Screen it, then deliver it delimited in a tool result | Join it to the instruction, or put it with standing instructions |
+| A lookup matches several identities | Identity is unresolved, ask one question | Pick the latest, or read every candidate's records |
+| A legal rule and a deadline both apply | The rule is fixed. Choose inside it | Weigh it against speed as one factor of several |
+| Asked for model-specific threat categories | Injection, context leakage, jailbreak, unsafe output reaching an action | Conventional infrastructure or supply-chain risks |
 
-**A habit that works past the table.** For any control on offer, ask one question. Do the **attacker's words and the control's words** end up read by the **same reader**? Where they do, what you have been offered is a **preference**.
+One test outlives the table. If one reader reads both the attacker's words and the control's words, the control is only a preference.
 
-**ELI5.** Many wrong answers add another sticky note, watch the thief on camera, ask the helper to guard itself, or leave the vault open with a "please don't" sign. None of those stop the thief. A real answer takes away the thief's way in.
+**ELI5.** Wrong answers are often good ideas in the wrong place, like a camera where you needed a lock.
 
-## What to remember
+## What to Remember
 
-- **Prompt injection** is **instructions planted in content** the model reads for somebody. They are **weighed like your own** because a model gets **one token stream with no mark** dividing trusted from untrusted. The vector is any **text a stranger can write** that your system reads, **planted content included**.
-- Sort every control by whether the **attacker's text can reach** it. Inside that **writable channel**, meaning the **assembled prompt**, the model's **reading of it and its output**, a control is a **request**. Outside it, a **rule**. An **instruction to ignore embedded instructions** is **read by the reader** being attacked.
-- A **jailbreak targets the model's own limits** and your user is the **attacker**, so **input screening and throttling** repeat offenders apply. An **injection targets your application's actions** and your user is the **victim**, so **nobody is left** to throttle. Both need the **same two halves**: **constrain what reaches the model**, then **constrain** what it may do.
-- Untrusted content is **screened before assembly**, delivered inside **tool result blocks** rather than a system prompt or plain user text, **JSON-encoded** so **escaping supplies the delimiter**, and **labelled with its source**. Your **own instructions never go in a tool result**, because the model treats that content as **untrusted too**.
-- **Minimisation is the leak control** with nothing left to undo, because **redaction, access limits and review** act on data that already exists. **Send only the fields** the task needs, **redact before the log write**, and treat an **unguessable path as obscurity** rather than access control.
-- PHI in the Claude API **sits in message content**, **attached files**, and **file names and metadata**. It is not expected in **workspace names, user contact details**, **billing or support tickets**. JSON schemas compile to **separately cached grammars** without those protections, so keep identifiers out of **property names, enums, consts and patterns**.
-- **Zero data retention** stops **storage of prompts and responses** at rest after the response returns and is **enabled per organisation**. **HIPAA readiness applies lifecycle safeguards** instead of deletion and is the arrangement for **PHI**. Residency is **two settings**: where **inference runs**, and where **data is stored**.
-- **Authorisation belongs to the operation**, enforced **server-side against the requesting identity**, giving the same verdict on a **persuaded model**. **Settle identity** before operating. **Several matches** means unresolved, and one **disambiguating question** beats ranking by **recency**.
-- **Least privilege decides severity, not likelihood.** One injection is an incident against a **broad identity**, and a **refusal plus an audit line** against a narrow one. A tool taking **validated catalogue identifiers** makes a disallowed fetch **impossible rather than discouraged**.
+- Prompt injection is instructions planted in content the model reads for somebody. It takes them like yours, since it gets one token stream with no mark between trusted and untrusted. Any text a stranger can write is a way in, planted content included.
+- Ask if the attacker's text can reach a control. Inside the writable channel (the assembled prompt, the model's reading of it and its output) it is a request. Outside, it is a rule. An instruction to ignore embedded instructions is read by the reader under attack.
+- A jailbreak targets the model's own limits, with your user as attacker, so input screening and throttling work. An injection targets your application's actions, with your user as victim, so nobody is left to throttle. Both need the same two halves: limit what reaches the model, then limit what it may do.
+- Untrusted content is screened before assembly, sent in tool result blocks (not a system prompt or plain user text), JSON-encoded so escaping supplies the delimiter, and labelled with its source. Never put your own instructions in a tool result, which the model treats as untrusted too.
+- Minimisation leaves nothing to undo, since redaction, access limits and review act on data that exists. Send only the fields the task needs. Redact before the log write. An unguessable path is obscurity, not access control.
+- PHI in the Claude API sits in message content, attached files, and file names and metadata. It is not expected in workspace names, user contact details, billing or support tickets. JSON schemas compile to separately cached grammars without those protections. Keep identifiers out of property names, enums, consts and patterns.
+- **Zero data retention** stops storage of prompts and responses at rest after the response returns, enabled per organisation. HIPAA readiness applies lifecycle safeguards, not deletion, and fits PHI. Residency has two settings: where inference runs and where data is stored.
+- Authorisation belongs to the operation, checked server-side against the requesting identity, so a persuaded model gets the same verdict. Settle identity first. Several matches means unresolved, and one disambiguating question beats ranking by recency.
+- Least privilege decides severity, not likelihood. A broad identity makes one injection an incident. A narrow one gives a refusal plus an audit line. A tool taking validated catalogue identifiers makes a disallowed fetch impossible rather than discouraged.
 
-**ELI5.** A helper reads mail and can't tell a stranger's order from the boss's. So don't rely on telling the helper to be careful. Check mail at the door, keep it in its own tray, send only what is needed, and put the real keys behind a guard who checks who is asking. Give each helper keys to a small room only.
+**ELI5.** Strangers can slip notes into anything the helper reads. Check the mail at the door, share only what is needed, and give each helper keys to one room.
 
 ## Endnotes for this chapter
 

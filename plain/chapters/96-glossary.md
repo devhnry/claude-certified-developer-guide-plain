@@ -1,99 +1,99 @@
 # Glossary
 
-**Summary**: *This glossary has two kinds of entry. The first kind is names this book gives to patterns that keep coming back. Learn them so you can spot the pattern in an exam scenario about an industry nobody here has mentioned. The second kind is platform terms. Their definitions are exact, and exam items are built on the difference between two of them. Being roughly right about one is the same as being wrong. The chapter numbers point to where each term is argued, not just used.*
+**Summary:** *Two kinds of entry, and each goes wrong differently. First, names this book made up for patterns that keep coming back, so you can spot one in a scenario from an industry we never mentioned. Second, platform terms. Their meanings are exact and items turn on the gap between two of them, so roughly right is wrong. Chapter numbers point to where the idea is argued, not just used.*
 
 ## Names This Book Gives to Recurring Shapes
 
-The **accreting prompt** (ch. 5). A prompt that has grown by adding for months. Each paragraph was a fair reaction to one bad output, and nothing was ever removed. It fails on length, because a long input pulls a long output. That costs you latency and buys no accuracy. *Like a to-do list where every note ever written is still taped to the wall.*
+The accreting prompt (ch. 5). A prompt that gets a new paragraph every month. Each one answered one bad output. None was ever removed. It breaks on length: long input pulls long output, adding latency and no accuracy.
 
-The **boundary clause** (ch. 9). The sentence in a tool description that names the requests this tool does not handle, and says which tool handles them instead. If you leave it out, Claude has no way to rule the tool out. So it calls the tool, reads what comes back, and calls the other one too. *"Do not use this for refunds. Use `issue_refund`."*
+The boundary clause (ch. 9). One sentence in a tool description. It lists the requests the tool does not handle and names the tool that does. Without it, Claude cannot rule the tool out. It calls it, reads the result, then calls the other tool too.
 
-The **carried cost** (ch. 8). What today's request pays for material you already sent, and were already charged for, on an earlier request. Caching attacks this cost. It grows as the conversation gets longer, while the question you ask stays the same size. *Re-reading the whole book aloud every time you ask one new question.*
+The carried cost (ch. 8). Each request pays again for material you sent, and already paid for, earlier. Caching attacks it. It grows with the conversation while your new question stays the same size.
 
-The **copy set** (ch. 22). Every place a credential's value has ended up, plus the access each of those places carries. Three measurements describe the damage a leak does: how many copies exist, what each one can reach, and how long each stays valid. *One key cut into five copies: you count the copies, the doors they open, and how long each works.*
+The copy set (ch. 22). List every place a credential's value ends up stored, and the access each place gives. Three numbers size a leak: copies, what each reaches, how long each stays valid.
 
-The **crossing rule** (ch. 16). What makes a link between two components real instead of imagined. Three things have to be written down: what may cross, which single component decides, and what happens to material that fails the decision. If it is written only into a prompt, it is a preference with good adherence, not a rule.
+The crossing rule (ch. 16). It tells you if a link between components is real or only drawn on a diagram. Write down what may cross, which one component decides, and what happens to material that fails. If it lives only in a prompt, it is a wish that usually gets followed.
 
-The **dependency assumed frozen** (ch. 23). A version, a model, an endpoint or a schema that you treat as permanent because it has not changed yet. It causes one specific failure: a migration run as an incident, on a deadline somebody else set, in the week it turns urgent. *"That model name has worked for a year, so it will always work."*
+The dependency assumed frozen (ch. 23). A version, model, endpoint or schema you treat as permanent because it has not changed yet. Then you run a migration as an incident, on a deadline someone else set, in the week it turns urgent.
 
-The **enumeration test** (ch. 12). Ask whether you can write down the steps in advance. If you can, letting a model choose the steps at runtime adds cost and variance and buys nothing. It is a test for what the task leaves open. It is not an argument that simple designs are better.
+The enumeration test (ch. 12). Can you write the steps down ahead of time? Then a model picking them at runtime only adds cost and variance. It shows what the task leaves open, not that simple designs always win.
 
-The **execution question** (ch. 11). Does this capability have to reach a system that holds live state and checks who is calling? Or is it just knowledge about how work gets done? Ask it first, and it removes two of the four candidate mechanisms before any comparison starts.
+The execution question (ch. 11). Must this capability reach a system that holds live state and checks its callers? Or is it knowledge about how to do the work? Ask it first. Two of four candidate mechanisms drop out before any comparison.
 
-The **field of view** (ch. 19). What a single check can observe: one function, one call, one flow, one number. A failure can only be found by a check whose field of view contains it. That is why a suite of green tests and a broken product can both be true at once.
+The field of view (ch. 19). What one check can see: a single function, call, flow or number. A check finds a failure only if the failure is inside its view. So green tests and a broken product can coexist.
 
-The **four-part call** (ch. 2). Every request to Claude, reduced to what it always has: an address, headers that authenticate and pin a version, a body, and a response you have to interpret rather than just read. Every failure worth debugging sits in a seam between two of those parts.
+The four-part call (ch. 2). Any request to Claude has an address, headers that authenticate and pin a version, a body, and a response you interpret, not just read. Bugs hide where two parts meet.
 
-The **model-shaped dependency** (ch. 17). What sits at the far end of the call. Five properties describe it and decide your engineering: it is remote, it varies in what it returns, it is billed per call, it is versioned on somebody else's schedule, and it can fail while reporting success.
+The model-shaped dependency (ch. 17). What sits at the far end of the call. Five properties shape your engineering: it is remote, what it returns varies, it is billed per call, someone else sets its version schedule, and it can fail while reporting success.
 
-The **ownership ledger** (ch. 13). Two columns for every framework decision: what leaves your codebase, and what arrives as an inherited assumption. If you argue for a choice from one column only, it is not a real choice.
+The ownership ledger (ch. 13). Keep two columns for each framework decision: what leaves your codebase, and what arrives as an inherited assumption. Judging by one column is not a choice.
 
-The **placement sort** (ch. 5). Sorting the text in a prompt with two questions: how long does it apply, and who could have written it? Where the text goes follows from the answers. So where you put an instruction is a trust decision before it is a style decision.
+The placement sort (ch. 5). Sort the text in a prompt with two questions. How long does it apply? Who could have written it? Placement follows the answers, so it is a trust decision before a style one.
 
-The **point of refusal** (ch. 21). The moment in a sequence where something declines to go on. A control without one shapes what Claude tries to do, but never changes what the runtime allows. That makes it advice. *A sign saying "please don't enter" versus a locked door.*
+The point of refusal (ch. 21). A step in the sequence where something is able to say no. A control that lacks one only shapes what Claude tries to do. It never changes what the runtime allows. That makes it advice.
 
-The **reuse boundary** (ch. 10). The point where a capability stops belonging to one application and becomes a separately released artifact that several callers depend on. Once you cross it, an internal function turns into a versioned contract with an upgrade schedule.
+The reuse boundary (ch. 10). The line where a capability stops belonging to one application. It becomes its own released artifact, and several callers rely on it. Crossing makes an internal function a versioned contract with an upgrade schedule.
 
-The **shape question** and the **truth question** (ch. 6). Two questions a response has to answer separately. Shape asks whether it is addressable: the fields are present, the types are right, and the values are inside the permitted set. Truth asks whether those fields match the world. Constrained generation settles the first and cannot touch the second. *A form filled in neatly (shape) can still say the wrong date of birth (truth).*
+The shape question and the truth question (ch. 6). A response has to pass two separate tests. Shape: can you address it? Fields are present, types are right, values fall in the permitted set. Truth: do those fields match the real world? Constrained generation handles shape and cannot touch truth.
 
-The **spent context** (ch. 7). Material fetched for a step that has since finished. It is resent on every later request, and it draws on the same budget as the question you actually want answered. It costs tokens and it competes for attention, and both halves matter.
+The spent context (ch. 7). Material fetched for a step that is over, yet resent with every later request. It draws on the same budget as your real question. It costs tokens and competes for attention.
 
-The **standing constraint** (ch. 15). A property of the environment that existed before the request, appears in nobody's description of the work, and decides the design anyway. It shows up late. For example, a cache that breaks a tenancy rule surfaces months later, once, when one tenant is served another tenant's decision.
+The standing constraint (ch. 15). A fact about the environment that predates the request. Nobody mentions it, yet it decides the design, and it shows up late. A cache breaks a tenancy rule, and months later, once, one tenant is served another tenant's decision.
 
-The **standing grant** (ch. 14). Authority handed over once, in a file, and then inherited by every later session. Nobody asks whether the task in front of them needs it. Permission modes, settings files, context files and allow rules are all standing grants. *A spare key left under the mat for everyone who comes after.*
+The standing grant (ch. 14). Authority given once, in a file, then inherited by every later session. Nobody asks if the task at hand needs it. Allow rules, permission modes, settings files and context files all count.
 
-The **unattributable window** (ch. 18). The span between the last reproducible state and the current one. It holds every change nobody recorded. Its width is the real measure of how well a system is configured, and nothing inside it can be traced to a cause afterwards.
+The unattributable window (ch. 18). The span from the last reproducible state to the current one. Every change nobody recorded sits inside it. Its width measures how well the system is configured. Nothing in it can be traced later.
 
-The **unstated triple** (ch. 4). Three figures that a model choice depends on, and that arrive in no requirements document: the quality bar the output must clear, the ceiling on how long somebody will wait, and the spend the business carries per unit of work.
+The unstated triple (ch. 4). Three figures a model choice depends on, which no requirements document gives: the quality the output must reach, the longest anyone will wait, and what the business spends per unit of work.
 
-The **waiting party** (ch. 3). The entity whose clock the request sits on. Naming it decides the request shape by itself. A person watching output appear, a caller blocked on a return value, and a job nobody is waiting for need three different mechanisms.
+The waiting party (ch. 3). Whoever's clock the request runs on. Naming it settles the shape. Someone watching output appear, a caller blocked on a return value, and a job nobody waits for need three different mechanisms.
 
-The **writable channel** (ch. 20). Everything an injected instruction can reach: the assembled prompt, the model's reading of it, and the model's output. Defences are ranked by how far outside that channel they sit.
+The writable channel (ch. 20). Everything an injected instruction can reach: the assembled prompt, the model's reading of it, and its output. Defences rank higher the further outside it they sit.
+
+**ELI5.** Problems come back in new clothes. A nickname lets you say "that one again" on sight.
 
 ## Platform Terms Whose Exact Meaning Decides Items
 
-**Adaptive thinking**. The model decides how much visible reasoning a request needs, instead of the caller setting a token budget for it. On the newest models an explicit `budget_tokens` value is not supported and returns a `400`. Effort is a separate output-level setting (ch. 1, ch. 17).
+**Adaptive thinking**. The model decides how much visible reasoning a request deserves. The caller sets no token budget. On the newest models an explicit `budget_tokens` value is not supported and returns a `400`. Effort is a separate output-level setting (ch. 1, ch. 17).
 
-**Agent SDK**. Anthropic's version of the agent loop. The tool-calling cycle, context handling, permissions and session management are already built. Adopting it deletes roughly sixty lines of your code and installs a set of assumptions in their place (ch. 13).
+**Agent SDK**. Anthropic's own build of the agent loop. The tool-calling cycle, context handling, permissions and session management come ready made. Using it removes roughly sixty lines of your code and brings in a set of assumptions (ch. 13).
 
-**Batch API**. Asynchronous processing (you do not wait for the answer) for work nobody is waiting on. It is priced at a discount compared with synchronous calls. The discount stacks with other pricing modifiers (ch. 3, ch. 8). *Overnight report generation.*
+**Batch API**. For work nobody waits on. It runs asynchronously and costs less than synchronous calls. The discount stacks with other pricing modifiers (ch. 3, ch. 8).
 
-**Context window**. How much a single request can carry: system prompt, tools, conversation history, retrieved material, and the output for the turn. It is working memory, not storage. Caching changes what those tokens cost, not whether they take up room (ch. 1, ch. 7). *The size of the desk.*
+**Context window**. How much one request can carry: system prompt, tools, conversation history, retrieved material and the turn's output. It is working memory, not storage. Caching changes their cost, not whether they take room (ch. 1, ch. 7).
 
-**Effort**. A setting for how much work goes into producing the response. It is independent of model choice and of thinking. So model, thinking and effort are three settings, not one quality dial (ch. 1).
+Effort. A dial for how much work goes into the response. It is separate from model choice and from thinking. So model, thinking and effort are three settings, not one quality dial (ch. 1).
 
-**Fast mode**. A speed setting. It buys more output tokens per second at premium pricing. It does not buy capability (ch. 1).
+Fast mode. A speed setting. You pay premium prices for more output tokens per second. It buys no capability (ch. 1).
 
-**Hook**. A deterministic action (it always runs the same way) that the runtime executes at a defined point in the sequence, whatever the model decided. This is where an absolute prohibition belongs, because a context file cannot enforce one (ch. 14, ch. 21).
+**Hook**. An action the runtime always runs at a set point in the sequence, whatever the model decided. Put a flat ban here, because a context file cannot enforce one (ch. 14, ch. 21).
 
-**Idempotent**. Safe to repeat. If a retry crosses a boundary that writes, it performs a second write unless the operation is idempotent. That is why retry policy and write design are one decision (ch. 19). *Pressing the lift button twice does the same as pressing it once.*
+**Idempotent**. Safe to repeat. A retry that crosses a writing boundary writes a second time unless the operation is idempotent. So retry policy and write design are one decision (ch. 19).
 
-**MCP configuration scope**. Who loads a server, and nothing else. `local` is private to one project. `project` lives in a committed `.mcp.json` and reaches everyone who clones the repository. `user` is private to you across every project (ch. 10).
+**MCP configuration scope**. Only tells you who loads a server. `local` is private to one project. `project` sits in a committed `.mcp.json` and reaches everyone who clones the repository. `user` is private to you across every project (ch. 10).
 
-**MCP transport**. How the client reaches the server, decided by where the server runs. A server documented with a command to run uses stdio. One documented with a URL uses HTTP or SSE. Tools written in the application's own code use an in-process server with no transport at all (ch. 10, ch. 11).
+**MCP transport**. How the client reaches the server, set by where the process runs. A server documented with a command to run uses stdio. One documented with a URL uses HTTP or SSE. Tools written in the application's own code use an in-process server, with no transport at all (ch. 10, ch. 11).
 
-**Messages API**. The synchronous request path, and it is stateless (it remembers nothing between calls). The full conversation history goes up on every call. No handle identifies a conversation. Anything missing from the request is missing from the model's view (ch. 3, ch. 16).
+**Messages API**. Synchronous requests, no memory between them. The full history goes up on every call. No handle identifies a conversation. Anything missing from the request is missing from the model's view (ch. 3, ch. 16).
 
-**Plugin**. Skills, agents, hooks and MCP servers bundled into one versioned installable unit. This is how a chosen set travels to a team. Plugin skills are namespaced with the plugin's name, so two plugins can ship a skill with the same name (ch. 11).
+**Plugin**. Skills, agents, hooks and MCP servers bundled as one versioned installable unit. That is how a chosen set reaches a team. Each plugin skill is prefixed with the plugin's name, so two plugins can ship skills with one name (ch. 11).
 
-**Prompt caching**. A reduced rate for a prefix (the start of a prompt) that was seen before. Prefixes are built in one order: tools, then system, then messages. A change at any level invalidates that level and everything after it. The five-minute duration writes at 1.25x input price and the hour at 2x (ch. 8).
+**Prompt caching**. You pay less for a prefix the system has seen before. Prefixes build in one order: tools, then system, then messages. A change at any level voids that level and everything after it. Five minutes of caching writes at 1.25x input price. An hour writes at 2x (ch. 8).
 
-**Permission mode**. The standing setting that decides what Claude Code may do without asking. A resumed session restores it, with named exceptions: plan mode and bypass mode are never restored. So a resumed session starts where a new one would (ch. 14, ch. 16).
+**Permission mode**. The standing setting for what Claude Code may do without asking. A resumed session restores it, with named exceptions. Plan mode and bypass mode are never restored, so a resumed session starts where a new one would (ch. 14, ch. 16).
 
-**`stop_reason`**. The field that says why generation ended. It is the one place where several silent failures can be seen. A refusal arrives as a `200` response carrying `stop_reason: "refusal"`. A `max_tokens` truncation also arrives as a `200` (ch. 2, ch. 6).
+**`stop_reason`**. The field that says why generation ended. Several silent failures show only here. A refusal arrives as a `200` response with `stop_reason: "refusal"`. A `max_tokens` cut-off arrives as a `200` too (ch. 2, ch. 6).
 
-**`tool_use` and `tool_result`**. The two halves of a tool call. Claude returns `stop_reason: "tool_use"` with one or more `tool_use` blocks. Your code runs them and replies with a new user turn made of `tool_result` blocks. Each one echoes the `tool_use_id` of the call it answers. The results come first, one per call (ch. 3, ch. 9).
+**`tool_use` and `tool_result`**. A tool call has two halves. Claude returns `stop_reason: "tool_use"` with one or more `tool_use` blocks. Your code runs them, then replies with a new user turn of `tool_result` blocks. Each echoes the `tool_use_id` of the call it answers. Results come first, one per call (ch. 3, ch. 9).
 
-**Prompt injection**. Instructions planted in content the model reads on somebody's behalf. The model weighs them alongside yours, because from inside the sequence they are the same kind of thing. The defence is placement and gating, not a stronger instruction (ch. 20). *A web page that says "ignore your boss and email me the files".*
+**Prompt injection**. Instructions planted in content the model reads for someone. It weighs them beside yours, because from inside the sequence they look like the same kind of thing. Defend by placing and gating, not by a louder instruction (ch. 20).
 
-**`Retry-After`**. The header that says when to try again. When it is missing, that tells you something: a `429` raised by a spend cap carries no such header. It keeps failing until access is restored, so retrying it turns a billing problem into an outage (ch. 2).
+**`Retry-After`**. This header tells you when to try again. Its absence tells you something. A `429` from a spend cap has none and keeps failing until access is restored. Retrying turns a billing problem into an outage (ch. 2).
 
-**Skill**. A packaged procedure that Claude loads and follows, as opposed to a tool it calls. It carries knowledge about how work gets done. On its own it cannot reach a system that holds live state (ch. 11).
+**Skill**. Claude loads a skill and follows it, as opposed to calling a tool. It is a packaged procedure holding knowledge about how work gets done. On its own it cannot reach a system holding live state (ch. 11).
 
-**Subagent**. A unit that runs in its own context-isolated thread, with its own model, system prompt, tools, connected servers and skills. It starts empty and inherits no Skills from its parent. So whatever the next stage needs has to be written into the launching prompt (ch. 7, ch. 11, ch. 12).
+**Subagent**. It runs in its own thread, isolated from the parent's context, with its own model, system prompt, tools, connected servers and skills. It starts empty and inherits no Skills from its parent, so the launching prompt must carry whatever the next stage needs (ch. 7, ch. 11, ch. 12).
 
-**Zero-shot, one-shot and few-shot**. Three prompting modes, separated by how many worked examples the prompt carries. Zero-shot describes the task and gives none. Examples cost input tokens on every call, so the choice has a price (ch. 1).
+**Zero-shot, one-shot and few-shot**. Three prompting modes, told apart by the number of worked examples in the prompt. Zero-shot describes the task and supplies no example. Examples cost input tokens on every call, so the choice has a price (ch. 1).
 
-## ELI5
-
-**ELI5.** A glossary is a list of words with what they mean. Some words are names this book made up for problems that keep showing up, like a cluttered prompt or a key copied too many times. The other words are the real names Claude's tools use. Those must be exact, because the exam asks about the tiny difference between two of them.
+**ELI5.** Each word here means one exact thing. Test questions hinge on the gap between two of them.

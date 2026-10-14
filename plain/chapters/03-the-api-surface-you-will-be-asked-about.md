@@ -1,44 +1,31 @@
 # Chapter 3: Messages, Streaming, Batches: Who Is Waiting Decides
 
-**Summary**: *Three requests can carry the same model, the same prompt and the same document and still belong on three different endpoints. What separates them is who is holding still until the answer lands. Read that wrong and you pay full price for work nobody was watching. Or you leave somebody staring at an empty panel while a perfectly good response assembles itself out of sight. This chapter is the API surface arranged around that question, from the shape of one message to the shape of forty thousand.*
+**Summary**: *The same model, prompt and document can belong on three different endpoints. What separates them is who is stuck waiting for the answer. Get that wrong and you pay full price for work nobody watched. Or a person stares at a blank panel while a good answer builds out of sight. This chapter walks the API from one message up to forty thousand, always asking that one question.*
 
 ## Who Is Waiting Is Established Before Anything Else and Changed Last
 
-**First, the idea.** Every request to Claude is like an order sent to a restaurant kitchen. The kitchen is the **API** (the service you call). Your order slip is the **request**. The plate that comes back is the **response**. The same dish can be served in different ways, depending on who is waiting for it. That person is what this chapter is about.
+Picture a restaurant kitchen. That is our one analogy for the chapter. Three orders arrive for the same dish, made the same way.
 
-**Three orders, same dish.** Identical model, identical instructions, identical attached document.
-- One was typed by somebody **watching a cursor blink** (a diner at the table).
-- One came from a service that **owes an HTTP response** inside **two seconds** (a customer standing at the counter).
-- One is number 8,431 in an **overnight run** of forty thousand. The only **deadline** is a report due at eight in the morning (a big catering order).
+One is from a diner at a table, watching the kitchen door. One is from a customer on the phone who needs a reply within **two seconds**. The third is order 8,431 in a catering job for forty thousand meals. Its only deadline is a delivery at eight the next morning.
 
-Nothing in the **prompt distinguishes** them. Everything about the **delivery** does.
+Call the person who is waiting the **waiting party**: whoever's clock the request runs on. It might be a human watching a screen (the diner). It might be a caller blocked until a value comes back (the phone customer). It might be nobody until a deadline hours away (the catering job). Settle this early. Endpoint, error handling, cost and interface all follow from it. Settle it late and you rebuild all four.
 
-**The waiting party.** Call this person the **waiting party**. It is the **entity whose clock the request sits** on. Sometimes that is a human watching a screen. Sometimes it is a **caller blocked** on a return value (stuck until the answer comes back). Sometimes it is nobody at all until a **deadline hours out**.
-
-**Why it comes first.** **Establish it once**, early, and **four decisions fall out** together. Establish it late and you get a **retrofit** (a rebuild), because the endpoint, the error handling, the cost model and the interface all bend around it.
-
-| Waiting party | Shape | What it buys | What it costs |
+| Who waits | Use | Gain | Price |
 |---|---|---|---|
-| A human watching output appear (the diner, dishes brought as they are ready) | A streamed message | Visible progress within a second | Event handling, and partial state to reassemble |
-| A caller blocked on the return value (waiting at the counter) | One ordinary message request | A single complete object to parse | The caller waits out the whole generation |
-| A caller doing other work meanwhile (several waiters sending orders at once) | Many ordinary requests, issued concurrently | Throughput without a queue | Your own rate limits, hit at your own pace |
-| Nobody, until a deadline hours away (the catering order) | A batch submission | Half the token price, higher throughput | Turnaround measured in hours, not seconds |
+| A person watching the screen | Streamed message | First words in under a second | You handle events and stitch pieces together |
+| A caller blocked on the result | One plain message request | One finished object, easy to parse | The caller sits through the whole generation |
+| A caller busy with other work | Many plain requests at once | Throughput with no queue | You run into your own rate limits |
+| Nobody until a deadline hours off | A batch | Half the token price, high throughput | Hours of wait, not seconds |
 
-**Rows three and four are not the same.** Read them against each other, because they are the pair that exam scenarios pull apart. Both are described as **asynchronous** (not waiting in line), and they solve unrelated problems. **Non-blocking calls keep your process useful** while a request is in flight. Every response still **arrives at conversational speed**. A **batch gives up that speed** entirely and takes a discount for it.
+Compare rows three and four. People call both "asynchronous", but they solve different problems. Row three is several cooks working at once. Your program stays busy while requests are in flight, and each answer still arrives at normal speed. Row four (a batch) gives up that speed completely and takes a discount in return.
 
-**ELI5.** Before you send an order, ask who is waiting for the food. A person at the table wants dishes as they are ready. Someone at the counter wants the whole meal at once. A big catering order can come later, and it costs less.
+**ELI5.** Some people eat at the table and want food now. Some will wait if it costs less. Before you cook, ask who is waiting and for how long.
 
 ## One Message Request Is a Model, a Cap, and a List of Turns
 
-**First, the idea.** An order slip is smaller than people expect. It says which chef to use, how long the answer may be, and what has been said so far.
+A request has three parts. A model name. A limit on reply length. And `messages`, a list of turns, each with a `role` and a `content` array. Standing instructions skip the turns and go in their own top-level `system` field.<sup>[1]</sup>
 
-**What goes on the slip?**
-- A **model identifier** (which chef).
-- A **ceiling** on how long the response may run (`max_tokens`).
-- **`messages`**: an **ordered list of turns**, each one a `role` and a `content` array.
-- **Standing instructions** (the house rules), which go in a **separate top-level `system` field** rather than into any turn.<sup>[1]</sup>
-
-**Content is a list of typed blocks.** It is not a plain string. Think of each block as one item on the slip. The **block type is the extension point** (the place where new kinds of things plug in). That one choice is why a **single endpoint absorbs** text, images, documents, tool calls and reasoning without ever needing a sibling. A response comes back the same way. It holds an `id`, `role: "assistant"`, a `content` array of blocks, a **`stop_reason`** and a **`usage` object** counting the tokens (small chunks of text) in and out.<sup>[1]</sup>
+Content is not a string. It is a list of typed blocks. So one endpoint can carry text, images, documents, tool calls and reasoning, and a new kind of content only needs a new block type. A reply comes back the same way, holding an `id`, `role: "assistant"`, the blocks, a **`stop_reason`**, and a `usage` object that counts tokens in and out.<sup>[1]</sup>
 
 ```
 POST /v1/messages
@@ -50,115 +37,102 @@ POST /v1/messages
 }
 ```
 
-**The kitchen forgets you.** This is the property that governs everything after it. The **Messages API is stateless**. That means the kitchen keeps no memory between orders, so the **full conversational history** goes up on **every call**.<sup>[1]</sup> **No handle identifies a conversation**. A **multi-turn exchange** is a list you keep and grow. Append the assistant turn you got back, append the next user turn, then send the whole thing again.
+Now the fact that shapes everything after it. The Messages API is **stateless**. It remembers nothing, so every call carries the full history.<sup>[1]</sup> There is no conversation ID. A chat is a list you keep. Add Claude's reply, add the next user turn, send it all again.
 
-**Two consequences** come with that, and both can be examined.
-- **Earlier turns** do not have to have come from Claude. **Synthetic assistant turns** (turns you wrote yourself) are a documented technique. You can also **prefill the beginning of the answer** by putting **partial assistant content** in the final position of the list.<sup>[1]</sup> Chapter 5 covers what to put in those turns.
-- **The history is the bill.** **Every turn you carry** is **input tokens** again on the next call. So a conversation gets **more expensive per exchange** as it grows, even though the questions stay the same size. Chapter 7 covers what to do when the window fills up. Chapter 8 covers the arithmetic.
+Two things follow.
 
-**One refinement to `system`.** It exists for a **caching reason**. On the newer models a message with `"role": "system"` may **appear after a user turn**. It carries the same authority as the top-level field. It **cannot come first**. Because it lands at the **end of the history** rather than the front, it adds an instruction without **invalidating a cached prefix** (the saved start of the prompt) that was already there.<sup>[1]</sup>
+First, you can write the "assistant" turns yourself. That is a documented technique. You can even begin Claude's answer: end the list with partial assistant text and Claude carries on from it (prefill).<sup>[1]</sup> Chapter 5 covers that.
 
-**ELI5.** The kitchen forgets you every time you order. So each new slip has to include everything said so far. Slips get longer, and longer slips cost more.
+Second, you pay for the history. Every old turn is billed as input again. So question ten costs more than question one, though both are the same length. Chapter 7 covers a full window. Chapter 8 covers the maths.
+
+One more detail on `system`, because it exists for caching. On newer models, a `"role": "system"` message may come after a user turn and carries equal authority. It cannot open the list. Since it lands at the end, a cached prefix stays intact.<sup>[1]</sup>
+
+**ELI5.** Claude forgets you as soon as it answers. So each time, you hand it the whole notebook of what was said. A longer notebook costs more to read.
 
 ## A Tool Result Is Paired by Identifier, Not by Position or by Narration
 
-**First, the idea.** Sometimes Claude asks you to go and fetch something, like checking the pantry. That is a **tool round trip**. Two separate systems have to agree on which **answer belongs to which question**, and only one of them can read English. So the match is made by ticket number.
+In the kitchen, every order has a ticket number. The number says which dish belongs to which order. Tool calls work the same way. Claude asks, you run something, and the answer must match the question. Only one side reads English, so a number does the matching.
 
-**How the trip works.** Claude returns **`stop_reason: "tool_use"`** and one or more **`tool_use` blocks**. Each carries an `id` (the ticket number), a `name`, and an `input` object matching the tool's schema (its list of expected fields). You run the tool. Then you continue by sending a **new user turn of `tool_result` blocks**. Each one **echoes the `tool_use_id`** of the call it answers. The result goes in `content`, and `is_error` is set if the tool failed.<sup>[2]</sup>
+Here is the flow. Claude stops with **`stop_reason: "tool_use"`**. It sends one or more `tool_use` blocks, each with an `id`, a `name`, and an `input` object that matches the tool's schema. You run the tool. Then you send a fresh user turn made of `tool_result` blocks. Each repeats the `tool_use_id` (the ticket number) of its call. The output goes in `content`. If the tool failed, set `is_error`.<sup>[2]</sup>
 
-**Three rules, and each has teeth:**
-- That user message may carry the **result blocks and nothing else**. Adding a sentence of your own after them **ends the assistant turn**, and can fail the request outright.
-- The **`tools` array has to stay the same** across the continuation.
-- When the response carried a **thinking block**, the assistant content **goes back exactly as it arrived**, signature intact, so the reasoning stays attached to the call it produced.<sup>[3]</sup>
+Three rules come with this. Each has teeth.
 
-**Extra input for Claude** goes in a separate user message once the turn has closed.<sup>[2]</sup>
+- Put only result blocks in that message. If you add your own sentence after them, the assistant turn ends and the request may fail.
+- Keep the `tools` array identical on the follow-up.
+- If the reply had a thinking block, send the assistant content back exactly as it came, signature included. That keeps the reasoning tied to its call.<sup>[3]</sup>
 
-**Two named anti-patterns.** Both look **reasonable** in a code review.
-- **The result written as prose.** You take what the tool returned, phrase it as an English sentence, and send it as an ordinary user message. It reads fine to a human. But it has **discarded the identifier**, so **nothing structurally connects** the answer to the call. With **two tools in flight**, nothing says which is which. It is like a plate arriving with no ticket number.
-- **The result filed in the assistant turn.** You put the tool output into an assistant message, on the reasoning that the model asked for it, so the model's side owns it. But the **assistant turn is the record** of what Claude produced. Externally computed content placed there is an **assertion that Claude produced** it, which is false. It also leaves the original **`tool_use` block still waiting**.
+Extra input for Claude waits for its own user message once the turn has closed.<sup>[2]</sup>
 
-Chapter 9 covers how tools are **described and chosen**. This section is only the **wiring**.
+Two anti-patterns live here. Both pass a quick code review.
 
-**ELI5.** When Claude asks you to fetch something, it gives you a ticket number. You must bring the answer back with the same ticket number. A note that just says "here is what I found" can't be matched to anything.
+The first is **the result written as prose**. You turn the output into a sentence and send it as a normal user message. A person reads it fine. But the ticket number is gone. With two tools running, nothing says which answer is for which call.
+
+The second is **the result filed in the assistant turn**. The thinking: Claude asked, so it is Claude's. But the assistant turn records what Claude wrote. Putting outside content there falsely claims Claude produced it. It also leaves the original `tool_use` block unanswered.
+
+How tools are described and chosen is Chapter 9. Here we only wire them up.
+
+**ELI5.** Each question gets a numbered ticket. The answer must carry the same number, or nobody knows which question it answers.
 
 ## `stop_reason` Says What You Owe the Caller Next
 
-**First, the idea.** Every successful response carries a **`stop_reason`**. It tells you why the plate came out when it did. It is the difference between a message you can hand on and a **message that is a fragment**.<sup>[4]</sup> Group the values by what they oblige you to do, because the **obligation is what a scenario** is really asking about.
+Every successful reply carries a `stop_reason`. It says whether you hold a finished message or a piece of one.<sup>[4]</sup> Think of the kitchen calling out the state of the plate. Group the values by the duty each one creates, because that is what the exam asks.
 
-| What the response obliges you to do | Values that put you there | The move |
+| Duty | Values | What you do |
 |---|---|---|
-| Nothing. The turn is complete | `end_turn`, `stop_sequence` | Use the content. Read `stop_sequence` to see which sequence fired |
-| Construct a continuation and send it | `tool_use`, `pause_turn` | Return `tool_result` blocks for `tool_use`; for `pause_turn`, send the response back as it stands so the server-side loop resumes |
-| Tell the reader the answer is cut short | `max_tokens`, `model_context_window_exceeded` | Mark the output incomplete, or continue generation deliberately |
-| Route the request somewhere else | `refusal` | Retry on another Claude model; `stop_details` names the policy category |
+| None, the answer is whole | `end_turn`, `stop_sequence` | Use it. With `stop_sequence`, check which sequence fired |
+| Send a follow-up | `tool_use`, `pause_turn` | `tool_use`: reply with `tool_result` blocks. `pause_turn`: resend the response as it stands so the server-side loop resumes |
+| Flag a cut-off answer | `max_tokens`, `model_context_window_exceeded` | Mark it incomplete, or deliberately keep generating |
+| Go to another model | `refusal` | Retry on a different Claude model. `stop_details` gives the policy category |
 
-**Four obligations, seven values.** Two of them need a closer look.
+That is seven values and four duties. Two need a closer look.
 
-**`pause_turn` versus `tool_use`.** Both mean the **turn is unfinished**, but they are continued differently. That is the trap.
-- `pause_turn` comes back when the **server-side loop hits its iteration limit** while running platform tools. The continuation is the **response itself, unchanged**.
-- `tool_use` means **Claude is waiting** on you. The continuation is your **results**.<sup>[4]</sup>
+`pause_turn` and `tool_use` both mean "not done yet". You continue them differently, and that is the trap. With `pause_turn`, the server-side loop hit its iteration limit while running platform tools. You send Claude's own reply back, unchanged. With `tool_use`, Claude is waiting on you. You send your results.<sup>[4]</sup>
 
-**`refusal`.** This one **never announces itself as trouble**. It arrives as an **ordinary HTTP `200`** from a **safety classifier**. The documented handling is to retry the same request on a **different Claude model**.<sup>[4]</sup> Chapter 2 made the general version of this point about the seam between a **healthy status code** and a usable body. This is the field that closes it.
+A **`refusal`** never looks like trouble. A safety classifier sets it, and it comes back as a normal HTTP `200`. The documented answer is to send the same request to another Claude model.<sup>[4]</sup> Chapter 2 warned that a healthy status code can hide a bad body. This field is where you catch it.
 
-**The anti-pattern: the status code read as the verdict.** **`stop_reason`** is the specific repair. A pipeline that checks for `200` and parses the content will **forward a truncated document**, an **unresolved tool call**, and a refusal. All three look like ordinary short answers in a log. Nothing in the log says otherwise.
+Judging a reply by its status code is the anti-pattern. Reading `stop_reason` is the cure. A pipeline that checks only for `200` forwards truncated documents, open tool calls and refusals. In a log they all look like short answers.
 
-**ELI5.** A plate can leave the kitchen for different reasons. It might be finished, cut short, waiting on you, or sent back. The reason tells you what to do next. Looking only at "the kitchen answered" tells you nothing.
+**ELI5.** When Claude stops, it leaves a note saying why. Maybe it finished, ran out of room, or needs something from you. Read the note. A plain "OK" does not say.
 
 ## Streaming Changes When the Words Appear, Not What They Cost
 
-**First, the idea.** Streaming means the dishes come out one by one as they are ready, instead of all at once at the end. The meal is the same and costs the same. You just see it sooner.
+Think of a diner served course by course. Set **`"stream": true`** and the reply arrives in pieces over **server-sent events**.<sup>[5]</sup> Each event has a type name and a JSON payload. The order is steady, so you can write a state machine for it.
 
-**How it works.** Set **`"stream": true`** and the response comes back incrementally over **server-sent events** (a one-way flow of small messages from the server).<sup>[5]</sup> Every event carries a named type and a JSON payload. The order is regular, so you can write a **state machine** against it (code that moves through known steps).
-- A **`message_start` arrives first**, holding the message shell with empty content.
-- Each content block then opens with a **`content_block_start`**, fills through a run of **`content_block_delta`** events, and closes with a **`content_block_stop`**.
-- Top-level changes arrive in **`message_delta`**.
-- Then **`message_stop`**.
-- Keep-alive **`ping` events** appear anywhere.<sup>[5]</sup>
+The order is fixed. First `message_start`, with an empty shell. Then each content block opens (`content_block_start`), fills (`content_block_delta` events) and closes (`content_block_stop`). Changes to the whole message come in `message_delta`. The last event is `message_stop`. `ping` keep-alives can show up anywhere.<sup>[5]</sup>
 
-**Three facts** about the stream matter more than the **event names**.
-- **`stop_reason` is `null` in `message_start`**. It arrives later, in a **`message_delta`**.<sup>[4]</sup> Code that reads the opening event and moves on has read the field before it was filled in.
-- **Errors travel inside the stream.** During heavy load an **`overloaded_error`** can arrive as an `error` event on a connection that **already returned HTTP `200`**. A **non-streamed request would have failed** with a 529 instead.<sup>[5]</sup> A consumer that only handles text deltas will treat that as the end of a short answer.
-- New event types may be added under the **versioning policy**. So **unknown types are skipped** rather than treated as fatal.<sup>[5]</sup>
+Three facts matter more than the names.
 
-**A use with nobody watching.** The **SDKs can stream internally** and hand back the same complete message object an ordinary call returns. They require it for requests with a **large `max_tokens` value**. The reason is plain. A long generation on one non-streamed call **runs into HTTP timeouts**.<sup>[5]</sup> That is transport (how the data travels), using the same parameter.
+1. `stop_reason` is `null` in `message_start`. It arrives later, in a `message_delta`.<sup>[4]</sup> Code that reads the first event and moves on read it too early.
+2. Errors travel inside the stream. Under heavy load, an `overloaded_error` can arrive as an `error` event on a connection that already returned HTTP `200`. A non-streamed request would have failed with a 529.<sup>[5]</sup> A consumer that handles only text deltas will think the answer was just short.
+3. New event types may be added under the versioning policy. Skip types you do not know. Do not crash.<sup>[5]</sup>
 
-**The anti-pattern: streaming adopted as a throughput fix.** The words start appearing sooner. But the total **generation time does not shrink**, and the token cost is unchanged. A backend job that assembles the whole message before acting has **gained event-handling code** and nothing else. Streaming answers one requirement: a human is watching.
+Streaming has a second use with no viewer at all. The SDKs can stream under the hood and still give you one complete message. They require it for a large `max_tokens`, because a single long, non-streamed call hits HTTP timeouts.<sup>[5]</sup> That is about transport, not display.
 
-**ELI5.** Streaming is the kitchen sending out each dish as soon as it is ready. The meal takes just as long and costs just as much. It only helps if someone is sitting there hungry.
+The named anti-pattern is **streaming adopted as a throughput fix**. Words appear sooner, but total generation time does not shrink and the token cost stays put. A backend job that waits for the full message just gains extra event code. Streaming meets one need: a human is watching.
+
+**ELI5.** Streaming is getting the meal course by course. Same time, same cost. It just feels faster because you see food sooner.
 
 ## Images and Documents Arrive as Blocks, With Three Ways to Name the Bytes
 
-**First, the idea.** Sending a picture or a PDF is not a separate door. It is one more item on the same order slip. The only choice is how you point at the file.
+Say Claude must read a photo of a receipt. There is no separate vision endpoint. You put an `image` block in the user turn, next to your text. You point at the picture in one of three ways: inline `base64`, a `url` to a hosted image, or a `file_id` from the Files API. Formats are JPEG, PNG, GIF and WebP. Nothing larger than 8000 by 8000 pixels is allowed.<sup>[6]</sup>
 
-**Images.** Vision (Claude looking at images) is not a separate endpoint. An **`image` content block** sits in a user turn beside the text. The bytes (the raw file data) are named one of three ways:
-- inline **`base64`** (the file written out as text),
-- a **`url`** pointing at a hosted image,
-- a **`file_id`** returned by the Files API.
+Several images in one request are read together, which is how page-by-page document work happens. Label each one in your text. In a multi-turn chat, Claude keeps earlier images, so a follow-up about the first two needs no resend.<sup>[6]</sup>
 
-**JPEG, PNG, GIF and WebP** are accepted. No image may **exceed 8000 by 8000 pixels**.<sup>[6]</sup>
+This next limit is easy to trip and hard to spot. Past 20 image blocks in a request, a tighter per-image size rule applies to every image in it. That counts images resent from earlier turns and images inside tool results. Blocks over the limit are rejected with a validation error, not shrunk.<sup>[6]</sup>
 
-**Several images.** Several images in one request are **analysed together**, which is what makes **page-by-page document work** possible. **Label each one** in the accompanying text so you can refer to it later. In a **multi-turn conversation** Claude keeps access to images from earlier turns. So a follow-up question about the first two does not **require resending** them.<sup>[6]</sup>
+PDFs use `document` blocks and the same three routes. Each page is read as text and also turned into an image, so a PDF is billed both ways.<sup>[7]</sup> The page count sets the total. File size does not. Both the size limit and the page limit cover the whole request payload, not only the document.<sup>[7]</sup>
 
-**A limit that is easy to trip.** It is hard to diagnose. **Past 20 image blocks** in a single request, a **tighter per-image dimension rule** applies to every image in that request. That counts images you **resent from earlier turns** and images nested inside tool results. Blocks over the tighter limit are **rejected with a validation error** rather than being scaled down.<sup>[6]</sup>
+This is where the **Files API** helps. Upload once, get a `file_id`, then use that ID in later requests instead of encoding the content again.<sup>[8]</sup> It fixes base64 resent every turn, which you only notice when a chat about one scanned contract sends the whole contract each time.
 
-**PDFs.** **PDFs enter as `document` blocks** and take the same three routes. The cost model is what to carry away.
-- Each page is rendered as an image as well as read as text, so a **PDF is billed both ways**.<sup>[7]</sup>
-- **Page count drives the total**, not file size.
-- Both the size ceiling and the page ceiling apply to the **whole request payload** rather than to the document alone.<sup>[7]</sup>
+Check availability first. The Files API is on the first-party API, and in beta on some cloud paths but not all.<sup>[9]</sup>
 
-**The Files API.** This is where the **Files API** earns its place. **Upload once**, get a **`file_id`**, and use that identifier in as many later requests as you like. You do not **re-encode the content** each time.<sup>[8]</sup> **Base64 resent every turn** is the anti-pattern it fixes. You will not notice it until a conversation about one **scanned contract** has carried that contract over the wire on **every single turn**.
-
-**Availability.** Check this before you design around it. The **Files API** is offered on the **first-party API** (Anthropic's own). On some of the **cloud paths** it is in **beta**, and not on all of them.<sup>[9]</sup>
-
-**ELI5.** A picture or a PDF is just another item on the order slip. You can write it out in full, point to where it lives, or hand it in once and get a claim number. The claim number is best if you keep talking about the same file.
+**ELI5.** A picture or PDF is just another piece of the message. If you keep showing the same big one, upload it once and say "that one" afterwards.
 
 ## Batches Take Half the Price and Hand Back the Correlation Problem
 
-**First, the idea.** A batch is the catering order. You hand in a huge pile of orders together and collect them later at half price. The catch is that the finished dishes come back in no set order, so you must label each one.
+Back to the catering job. This is the **Message Batches API**, the last row of the first table. You submit everything together, and it runs asynchronously at 50% of standard prices. Most batches end in under an hour. Anything still open after 24 hours expires.<sup>[10]</sup>
 
-**The basics.** The **Message Batches API** is where the fourth row of the opening table lives. Requests are submitted together, processed asynchronously, and **charged at 50% of standard prices**. Most batches finish inside an hour. Any batch **unfinished at 24 hours expires**.<sup>[10]</sup>
-
-**Four steps, and the last two are yours.**
+There are four steps, and you own the last two.
 
 ```
 create   POST a "requests" list; each entry is a custom_id plus a params
@@ -168,91 +142,75 @@ collect  fetch results_url; JSONL, one result object per line
 match    join each line back to your work by its custom_id
 ```
 
-**Matching results.** **Results come back out of order**. You match them by **`custom_id`, never by position**.<sup>[10]</sup> That identifier is yours to choose, up to 64 characters of letters, digits, hyphens and underscores. Pick one that already means something in your own system. That is the difference between a **join and a guess**.
+Results come back in any order. So match them by `custom_id`, never by position.<sup>[10]</sup> This is the ticket number again. It is yours to pick: up to 64 letters, digits, hyphens or underscores. Use something your own system already understands, and matching is a join, not a guess.
 
-**The four result types.** The distinction is about billing as much as control flow.
-- **`succeeded`** carries the message.
-- **`errored`, `canceled` and `expired`** are **not billed** at all.<sup>[10]</sup>
+Each result is one of four types, which matters for billing too. `succeeded` holds the message. The other three, `errored`, `canceled` and `expired`, cost nothing.<sup>[10]</sup> The batch's `request_counts` totals them. One failure leaves the rest alone.<sup>[10]</sup> Results stay available for 29 days from creation. You can cancel mid-flight. The batch still ends, and may hold partial results.<sup>[10]</sup>
 
-The batch's **`request_counts`** totals them. **One request failing** leaves the rest of the batch alone.<sup>[10]</sup> Results stay **retrievable for 29 days** from creation. A batch can be **cancelled mid-flight**. It still ends, and may carry partial results.<sup>[10]</sup>
+A few Messages parameters are rejected in a batch, and each tells you something. `stream` fails because results arrive as a file. Fast mode fails because it speeds up synchronous calls, and a batch has none. Thread parameters fail because a batch request belongs to no thread.<sup>[10]</sup>
 
-**Parameters a batch rejects.** A short list of **Messages parameters** is **rejected in a batch**. Each refusal says something true about the shape.
-- **`stream` is refused** because results are collected as a file.
-- Fast mode is refused because it **tunes synchronous latency**, which no longer exists here.
-- **Stateful thread parameters** are refused because a batch request is not part of a thread.<sup>[10]</sup>
+Prompt caching stacks with the batch discount. But batch requests run concurrently, so cache hits are best effort.<sup>[10]</sup> Treat that saving as a bonus, not a floor.
 
-**Caching.** Prompt caching still applies and **stacks with the batch discount**. But batch requests run concurrently, so the **cache hits are best effort** rather than guaranteed.<sup>[10]</sup> Treat the saving as a bonus, not a floor.
+Two anti-patterns mirror each other.
 
-**Two anti-patterns, and they are mirror images.**
-- **Batch chosen for latency.** This treats "asynchronous" as a synonym for "faster". Nothing about a batch **returns any individual answer sooner**. If a caller is blocked on one result, batching it makes the wait worse and saves half of a rounding error. The **discount needs volume** to mean anything.
-- **A synchronous loop run at batch volume.** This is the commoner failure, and it is what an overnight job usually starts life as. **Tens of thousands of sequential calls** will meet your rate limits, occupy the process for the whole time, and cost twice what the same work costs submitted together. A batch is picked when there is **high volume** plus **indifference** to when any single answer lands. **Both halves have to hold**.
+**Batch chosen for latency.** This treats "asynchronous" as "faster". A batch returns no single answer sooner. If a caller is blocked on one answer, a batch only lengthens the wait for a tiny saving. The discount only matters at volume.
 
-**ELI5.** A batch is a huge catering order. It costs half as much, but it can take hours. The dishes come back mixed up, so every order needs its own label. It is for big piles when nobody is waiting, never for one hungry person.
+**A synchronous loop run at batch volume.** This is more common, and it is how an overnight job often starts. Tens of thousands of one-at-a-time calls hit your rate limits, tie up the process, and cost twice what a batch costs. Pick a batch when you have both: high volume, and no one cares when any single answer lands.
+
+**ELI5.** A batch is like dropping off a huge pile of laundry. It costs half as much, but you collect it later and it comes back in no set order. So you write your name on each item.
 
 ## Third-Party Providers Keep the Message Shape and Change the Frame Around It
 
-**First, the idea.** Some companies must order through a different front door, such as their cloud provider. The order slip looks the same. The door, the key and the bill are different.
+Say your company already pays for Bedrock, and security approved it. So Claude must be reached that way. The choices are **Amazon Bedrock**, **Google Cloud**, **Microsoft Foundry** and **Claude Platform on AWS**. The reasons are rarely technical: a contract, a signed-off security boundary, one billing relationship. The rule applies from the first call.
 
-**Why teams do this.** Enterprises route Claude through **Amazon Bedrock**, **Google Cloud**, **Microsoft Foundry** or **Claude Platform on AWS**. The reasons are rarely technical. It may be an existing commercial agreement, a security boundary a compliance team already signed off, or a billing relationship somebody wants to keep single. The constraint arrives as a fact about the organisation, and it **binds from the first call**.
+Most of what you use stays the same. Content blocks, `stop_reason`, tool use and streaming carry across. Anthropic's own client libraries support these platforms directly.<sup>[11]</sup> Bedrock uses the same Messages API shape, on AWS-managed servers inside the AWS security boundary.<sup>[12]</sup>
 
-**What stays the same.** That is the part you spend your time on. **Content blocks**, **`stop_reason`**, **tool use** and **streaming** carry across. Anthropic's own client libraries support these platforms directly, not through a translation layer.<sup>[11]</sup> **Bedrock exposes the same Messages API shape** while running on **AWS-managed infrastructure** inside the AWS security boundary.<sup>[12]</sup>
+What changes is the frame. Sign-in comes from the platform, not an Anthropic key. So do endpoints and model identifiers. Billing goes through its marketplace, which is often why the rule exists.<sup>[13]</sup> On Google Cloud the request differs in two ways. The model is named in the endpoint URL, not the body. And `anthropic_version` moves into the body, with a platform-specific value.<sup>[11]</sup> Features vary as well. Something on the first-party API may be beta or missing on a platform. On Foundry it differs even between hosting options.<sup>[9]</sup>
 
-**What changes.** The changes sit around the message.
-- **Authentication is the platform's**, not an **Anthropic key**.
-- **Endpoints and model identifiers** are the platform's.
-- Billing runs through the platform's marketplace, which is usually why the requirement exists at all.<sup>[13]</sup>
-- On **Google Cloud** the request itself differs in two named ways. The **model is named in the endpoint URL** rather than in the body. And **`anthropic_version` moves into the body** with a platform-specific value.<sup>[11]</sup>
-- **Feature availability is not uniform.** A capability present on the first-party API may be beta or absent on a given platform. On Foundry it differs between hosting options of the same platform.<sup>[9]</sup>
+There is one sound answer and two tempting wrong ones.
 
-**One sound answer and two tempting wrong ones.**
-- **The answer:** **call the mandated path** from the first commit. Put a **thin seam** (one small layer) between your application logic and the provider, so the parts that differ are named in one place.
-- **Wrong answer one, the deferred migration:** **build against the direct API** now, move later. Every request between now and later **violates the agreement**, and the **rework is guaranteed** rather than merely likely.
-- **Wrong answer two, the parallel implementation:** this one is worse arithmetic. You keep **two code paths maintained forever**, and the one that runs in production is still the one the contract prohibits.
+The sound answer is to use the required path from your first commit. Add a thin layer between your app and the provider, so what differs sits in one spot. Wrong answer one is the **deferred migration**: build on the direct API now, move later. Every request until then breaks the agreement, and the rework is certain. Wrong answer two is the **parallel implementation**. You keep two code paths for good, and the live one still breaks the contract.
 
-**ELI5.** Some companies must order through a different door. The order slip looks the same, but the key and the bill are different. Use the right door from day one. Do not plan to switch later.
+**ELI5.** It is the same dish in a different restaurant. Same recipe, but a different door, a different cashier and different menu names. Use the right door from day one.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on API mechanics are almost never inventions. They name a **real endpoint**, a real parameter and a real technique, and they **aim it at a requirement** it does not serve. **Four assumptions** produce most of them.
+Wrong answers here are rarely invented. They name a real technique and aim it at a need it does not meet. Four habits cause most of them.
 
-**The four wrong assumptions:**
-- **Asynchronous read as fast.** The option treats **batch submission** as a **performance improvement**. Not blocking is read as a kind of speed. **Batch throughput is high**, but the **turnaround on any single answer is worse**. The option becomes correct only when the scenario says the **volume is large** and **names no clock on individual results**.
-- **The delivery mechanism swapped for a different mechanism.** A requirement about *when* **output reaches somebody** is answered with **caching**, a **larger token cap**, a **schema**, or a **bigger model**. Each of those is a **real lever on cost, length, shape or capability**. None of them makes a **complete response arrive in pieces**, which is the only thing the requirement asked for.
-- **A structural pairing replaced by a description.** Options that **hand a tool result back as prose**, or **file it under the wrong role**, or **leave out the identifier**, all **lose the correlation** the protocol runs on. It reads correctly to a person and the API cannot resolve it. Ask what breaks when **two calls are outstanding at once**.
-- **A constraint deferred because it is not technical.** **Contractual routing**, **data residency** and **billing** arrive as requirements from outside engineering and get **treated as schedulable**. They **bind from the first call**. An option that satisfies the constraint later has left **every request in between** unsatisfying it.
+- **Asynchronous read as fast.** The option sells batching as a speed-up. Not blocking feels like speed, but it is not. A batch moves a lot of work, but any one answer is slower. It is right only when the volume is large and no clock sits on single results.
+- **Wrong lever for delivery.** The need is about when output reaches someone. The option offers caching, a bigger token cap, a schema or a bigger model. Those change cost, length, shape or skill. None makes a finished answer arrive in pieces.
+- **A matched pair swapped for a description.** Tool results sent as prose, under the wrong role, or without the identifier all lose the match the protocol needs. People can read them. The API cannot. Picture two open calls.
+- **A non-technical rule put off until later.** Contract routing, data residency and billing come from outside engineering, so people treat them as schedulable. They bind from call one. Meeting the rule later means failing it on every request until then.
 
-Match on what the **scenario** is doing, not on the **industry** it is dressed in.
+Read the scenario for what it needs, not for its industry.
 
-| When the scenario says | The answer is usually | The trap is usually |
+| Scenario | Usual answer | Usual trap |
 |---|---|---|
-| Thousands of items, no clock on any single result, cost is named | Asynchronous batch submission, results collected and joined afterwards | A synchronous loop, or a bigger token cap offered as throughput |
-| Users should see output as it is produced rather than after a pause | Streaming, so partial content is delivered while generation continues | Caching, a larger cap, or a schema, each answering a different requirement |
-| A tool ran and its output has to reach the model | A user turn of result blocks carrying the identifier of the call | Prose in a user message, a result placed in the assistant turn, or standing instructions |
-| An answer stopped short and nobody can say why | Read `stop_reason` and act on what it obliges | Treating HTTP `200` as proof the content is complete |
-| A contract or a compliance boundary names a cloud provider | Call the mandated path now, behind one provider-specific seam | Building direct and migrating later, or maintaining both paths |
-| The same large document is sent on every turn of a conversation | Upload once and reference it by identifier | Re-encoding the bytes into each request |
-| Results came back and the ordering does not match what was sent | Join on the identifier you assigned each request | Assuming responses arrive in submission order |
+| Thousands of items, no deadline on each, cost matters | Batch, then collect and join the results | A plain loop, or a bigger token cap called "throughput" |
+| Users want to see text as it is written | Streaming | Caching, a larger cap, or a schema |
+| A tool ran and Claude needs the output | A user turn of result blocks with the call's identifier | Prose, a result in the assistant turn, or standing instructions |
+| An answer ended early and nobody knows why | Read `stop_reason`, do what it says | Taking HTTP `200` as proof the content is whole |
+| A contract or compliance rule names a cloud | Use that path now, behind one provider seam | Build direct and migrate later, or keep both paths |
+| The same big document goes out every turn | Upload once, refer by identifier | Re-encoding the bytes each time |
+| Results came back in a different order | Join on the identifier you assigned | Assuming submission order |
 
-**A habit that works past the table.** **Name the waiting party out loud** before evaluating any option. Then ask whether the option acts on **delivery**, on **cost**, on **shape**, or on **capability**. Most wrong answers on this material are **correct answers** to one of the other three.
+One habit beats the table. Name the waiting party. Then ask whether the option works on delivery, cost, shape or capability. Most wrong answers are right answers to one of the other three.
 
-**ELI5.** Wrong answers are usually real tools used for the wrong job. Fix the speed problem with a speed tool, the cost problem with a cost tool. First ask who is waiting.
+**ELI5.** A wrong answer is often a good tool used for the wrong job, like fixing a slow waiter by buying a bigger oven. Ask who is waiting, then ask what the tool really changes.
 
 ## What to Remember
 
-- The **Messages API is stateless**, so **every call carries the whole history**: a **model**, a **`max_tokens` ceiling**, a **`messages` list** of role-and-content turns, and **standing instructions** in a **top-level `system` field** rather than in any turn.
-- **Content is a list of typed blocks**, which is why **text, images, documents**, tool calls and **reasoning** all travel through **one endpoint**. A response returns blocks plus **`stop_reason`** plus a **`usage` count**.
-- The **waiting party** is whose **clock the request sits** on: a **person watching**, a **caller blocked** on the reply, a **caller doing other work**, or **nobody until a deadline**. It **selects the endpoint** before the prompt is written.
-- **Seven `stop_reason` values create four obligations**: **nothing** (`end_turn`, `stop_sequence`), **send a continuation** (`tool_use`, `pause_turn`), **declare** the answer **incomplete** (`max_tokens`, `model_context_window_exceeded`), **retry elsewhere** (`refusal`, which arrives as a **normal HTTP `200`**).
-- A **tool result is a user turn** of **`tool_result` blocks**, each **echoing the `tool_use_id`** of the call it answers, **carrying nothing else** in that message, with the **`tools` array unchanged** and any **thinking block echoed back** verbatim.
-- **Streaming sends the same message earlier**, over **server-sent events**: **`message_start`**, then block start, deltas and stop, then **`message_delta`**, then **`message_stop`**. **`stop_reason` is null** at the start and **arrives in `message_delta`**, and an **overload error can appear** as an event after HTTP 200.
-- **Images and PDFs are content blocks** named three ways: **inline base64**, a **URL**, or a **`file_id`** from the **Files API**. **Past 20 image blocks** a **tighter dimension limit** applies to **every image** in the request, resent ones included.
-- A **PDF page is billed** as **text** and as an **image**, because **each page is rendered** as well as read. So **page count drives the cost** more than file size does.
-- **Batches run at 50%** of standard prices, mostly finish **within an hour**, and **expire at 24 hours**. Results **arrive out of order** and are **matched by the `custom_id`** you assigned. **`errored`, `canceled` and `expired`** results are **not billed**.
-- **`stream` and fast mode are rejected** inside a batch, because a **batch returns a file** and there is no **synchronous latency** left to tune.
-- **Non-blocking concurrency is not batching**. **Async clients keep your process busy** while responses still arrive at **conversational speed**. A **batch surrenders** that speed to buy the **discount** and the **throughput**.
-- **Third-party providers** keep the **message shape** and change the frame: **authentication, endpoints, model identifiers and billing** all become the platform's, **feature availability varies**, and on **Google Cloud** the **model moves into the URL** while **`anthropic_version`** moves into the body.
-
-**ELI5.** Ask who is waiting before you pick how to order. A person watching wants streaming. A blocked caller wants one plain request. A big pile with a late deadline goes in a batch at half price. Always match answers to orders by their ticket number.
+- The Messages API is stateless. Every call sends the whole history: a model, a `max_tokens` ceiling, a `messages` list of role-and-content turns, and standing instructions in the top-level `system` field, not in any turn.
+- Content is a list of typed blocks, so one endpoint carries text, images, documents, tool calls and reasoning. A response returns blocks plus `stop_reason` plus a `usage` count.
+- The waiting party (a person watching, a caller blocked on the reply, a caller doing other work, or nobody until a deadline) picks the endpoint before you write the prompt.
+- Seven `stop_reason` values make four duties: nothing (`end_turn`, `stop_sequence`), send a continuation (`tool_use`, `pause_turn`), declare the answer incomplete (`max_tokens`, `model_context_window_exceeded`), retry elsewhere (`refusal`, which arrives as a normal HTTP `200`).
+- A tool result is a user turn of `tool_result` blocks that echo the `tool_use_id`, with nothing else in that message, the same `tools` array, and any thinking block sent back as it came.
+- Streaming sends the same message earlier over server-sent events: `message_start`, then block start, deltas and stop, then `message_delta`, then `message_stop`. `stop_reason` is null at the start and arrives in `message_delta`. An overload error can show up as an event after HTTP 200.
+- Images and PDFs are content blocks named by inline base64, a URL, or a `file_id` from the Files API. Past 20 image blocks, a tighter dimension limit hits every image in the request, resent ones included.
+- A PDF page is billed as text and as an image, because each page is rendered as well as read. Page count drives cost more than file size.
+- Batches cost 50% of standard prices, mostly finish within an hour, and expire at 24 hours. Results come out of order, matched by the `custom_id` you assigned. `errored`, `canceled` and `expired` results are not billed.
+- `stream` and fast mode are rejected inside a batch, because a batch returns a file and there is no synchronous latency left to tune.
+- Non-blocking concurrency is not batching. Async clients keep your process busy and responses still arrive at conversational speed. A batch gives up that speed to buy the discount and the throughput.
+- Third-party providers keep the message shape but change the frame: authentication, endpoints, model identifiers and billing become the platform's, and feature availability varies. On Google Cloud the model moves into the URL and `anthropic_version` moves into the body.
 
 ## Endnotes for this chapter
 

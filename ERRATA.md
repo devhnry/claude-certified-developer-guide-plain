@@ -37,3 +37,29 @@ These chapters have an inner title that differs from the filename. Both are kept
 - 15: file `requirements-before-architecture`, title "Constraints Nobody States"
 - 16: file `designing-the-application`, title "Boundaries, Sessions, and Where Instructions Land"
 - 17: file `the-engineering-around-the-model`, title "REST, Versioning, Review: the Exam Beyond Claude"
+
+## More found during the second pass
+
+| Ch | What the original says | What it conflicts with |
+|---|---|---|
+| 02 | "Three of the eleven repay a second reading" | The section then discusses five codes: 400, 401, 402, 403 and 409. |
+| 02 | "Nine trips" for 3 x (1 + 2) attempts | The arithmetic reads as nine, but the text does not show the steps. |
+| 02 | The seam table | 504 is in no seam. 413 is the only code listed without backticks. |
+| 04 | Haiku 4.5 "caps output at 64k" and Opus 5 gives 128k | Endnote 3 lists Sonnet 5 at 128k. |
+| 07 | Summary says "three turns ago" | The body uses "ten turns" and "turn three". |
+| 07 | Two descriptions of compaction | One says the gist stays and specifics fade. The other says rules and details can be dropped. |
+| 07 | What to Remember lists `keep` | The body names only `clear_at_least`, `exclude_tools` and `clear_tool_inputs`. Endnote says `keep` defaults to 3. |
+| 07 | Twenty turns in testing, a fill at turn eight | The opening scenario is already twenty tool calls in. |
+| 08 | Frontier model at "five times" output | Endnote 2 names Fable 5 at $10/$50. |
+| 09 | A bare `tool_use` row | Its failure cell is empty. |
+| 11 | A Skill "cannot reach" things | The same section says a Skill "bundles scripts the runtime runs". |
+| 13 | "Four things get wired" | A separate "Four mechanics" list under hooks. |
+| 14 | `bypassPermissions` row says "Everything" | The text says protected-path writes are never auto-approved outside it. |
+| 19 | Body: "terminal as the cheaper guess" | What to Remember: "raise it as terminal when unsure". 404 is listed without backticks in the `400`/`401`/`403` set. |
+| 22 | "Rotation is the only repair"; "expiry is the only version that runs unattended" | Federation also runs unattended. |
+| 23 | A launch has "no end date" | The summary says gates "occasionally refuse" a decision to proceed. |
+
+## Checker notes
+
+- Chapter 95 (coverage map) fails `tools/check_similarity.py` on purpose. It is almost all tables of fixed chapter titles, skill names and numbers, so those count as reused sentences. Its facts all pass `tools/check_facts.py`.
+- Chapter 06 is a few words over the 95% length limit (about 96%). I put a paragraph back that had been cut, because it is the chapter's main idea.

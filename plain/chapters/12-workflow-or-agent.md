@@ -1,320 +1,220 @@
 # Chapter 12: Known Steps Take a Chain; Unknown Ones an Agent
 
-**Summary**: *Two systems can be built on one model, one tool set and one goal, and still differ entirely in who decides what happens next. Lean too far toward autonomy and you pay a model call to reach a conclusion somebody reached years ago. The bill also runs to fifteen times a chat once the work fans out. Lean too far the other way and the design fails on the first input that does not fit the route it was handed. This chapter is the architecture arranged around one question: what is genuinely not known before the run starts.*
+**Summary**: *Two systems can share a model, a tool set and a goal, yet differ in one big way: who picks the next move. If the model picks too often, you pay for a decision your team made years ago, and a fan-out can push the bill to fifteen times a chat. If code picks too often, the design snaps on the first input that is off the route. Everything here hangs on one question. What do you truly not know before the run starts?*
 
 ## Every Step You Can Write Down in Advance Is a Step No Model Needs to Choose
 
-**First, the idea.** Some jobs have steps you already know, in an order you already know. Those jobs do not need a model to decide what comes next. You write the order down in code, and the model only does the work inside each step.
+Think of a restaurant kitchen. A line cook follows a recipe card, same order every night. A head chef tastes the sauce and decides what to do next. The card is a workflow. The chef is an agent.
 
-**The analogy for this chapter: a kitchen.** A kitchen has two ways of making food. One is a **recipe card**. The steps are printed, in order, and the cook just follows them. That is a **workflow** (a path fixed in code). The other is a **chef who tastes as they go**. They decide the next move from what they find in the pot. That is an **agent** (a model that directs its own process). In both kitchens the cook is the same **model** and the pantry is the same **tool set**. The only difference is who decides the next step. The exam uses the real words, so every kitchen word below comes with its real term in bold.
+Here is a real case. A team wants help with **code review**. People have done it by hand for two years, and the routine never changed. Get the diff. Check it against the house style rules. Spot tests that should have changed and did not. Write a summary. Post it.
 
-**The example.** A team wants an assistant for their **code review**. The **sequence is already settled**, because humans have been **running it by hand** for **two years**. Pull the diff. Check it against the house style rules. Look for tests that should have moved and did not. Summarise what changed. Post the summary.
+Five steps, always in that order. Write them down.
 
-**Five steps**, same order, every time. Now **write them down**. That is the **recipe card (the chain of prompts)**.
+That one act decides the design. When you can list the steps before any input shows up, a **chain of prompts** (the recipe card) wins. It costs less and runs the same way twice. Each stage takes one input and returns one output. If one fails, you know its name and have a saved test case to rerun.
 
-That act **settles the architecture**. When the **sequence is knowable** before the input arrives, a **chain of prompts** is **cheaper, reproducible and inspectable** at every stage. Each stage takes one input and produces one output. Run it twice and the request travels the same route both times. Something breaks and the stage that broke has a **name and a fixture** (a saved test input) you can rerun.
+Now hand the same five steps to an agent. It first spends a model call deciding which step comes first. Your team settled that two years ago. You pay tokens and a round trip, and Tuesday's run may choose differently than Monday's.
 
-**What goes wrong with an agent here.** Hand those five steps to an agent instead and the first thing it does is **burn a model call** working out **which one comes first**. That is the chef stopping to decide whether to read the card. That call has **exactly one job**. It reaches a **conclusion the team reached** two years ago. You pay tokens for it. You pay a round trip for it. And you accept that Tuesday's run may reach a different conclusion.
+Call this the **enumeration test**. Could you list the steps before the input arrives? If so, put the plan in code and let the model work inside each step. If not, the model holds the plan and your code sets the limits. Anthropic frames the same split as control flow. A workflow sends models and tools down paths fixed in code. An agent steers itself and decides how to get the job done.<sup>[1]</sup> The real issue is who owns the next decision.
 
-**The enumeration test.** Can you write the sequence down before the input arrives?
-- If you can, **code holds the plan** (the recipe card) and the model does the work inside each step.
-- If you cannot, the **model holds the plan** (the chef decides) and your **code holds the limits**.
+Apply the test to each workload separately. A dependency review follows fixed rules. A debugging helper digs through unfamiliar code. They get different answers, so give them different designs. One checklist makes the debugger trudge through pointless steps. One flexible planner makes every dependency review re-decide what the rules decided.
 
-Anthropic draws the same line by asking where control flow (who decides the next step) lives. A workflow runs models and tools along **paths fixed in code**. An agent **directs its own process** and keeps control of how the task gets done.<sup>[1]</sup> Control flow is the **whole question**.
+Hard steps with messy input still go to the model. Code only takes what nobody doubted: the order.
 
-**Run the test on each workload.** The test has a second use, and it is the one scenarios reach for. Run it on **each workload separately** rather than once on the whole system. A **dependency review** that **follows fixed rules** and a **debugging assistant** that **explores unknown code** answer the test differently. So they should **not share a structure**. Force both through one checklist and investigations march through steps that do not apply. Give both an adaptive planner and every dependency review pays for a decision the rules already made. **One structure**, **two badly served workloads**.
-
-**This is not a vote for simple.** The enumeration test is **not an argument for simplicity**. It is an argument about where a **decision gets made**. A step whose content is **genuinely hard**, needing judgement over **ambiguous input**, still belongs to the model. What belongs in code is the part nobody was ever unsure about: **which step follows which**.
-
-**ELI5.** If you already know the steps, write them on a recipe card and let the cook follow the card. Do not pay a chef to think about it again every day. Let the cook think hard only inside a step that is truly tricky.
+**ELI5.** A recipe card lists every step, so the cook never wonders what comes next. If you can write the steps down, do. Spend the thinking on the tricky parts.
 
 ## Five Workflow Shapes, Each Selected by a Different Thing the Task Leaves Open
 
-**First, the idea.** There are named patterns for workflows. Do not learn them as a list. Learn them by what the run does not know when it starts.
-
-**Why not a catalogue.** The **named patterns** get taught as a **catalogue**. That is the wrong shape for using them. Sort them instead by what the **run does not know** when it begins, because that is the property a **scenario actually states**. In kitchen terms, these are five kinds of recipe card. Each one fits a different gap in what the cook knows.
+Do not memorise these as a menu. Sort them by what the run cannot know when it begins, because that is how exam scenarios describe them.
 
 | What is unsettled when the run begins | The shape that answers it | What it buys, and what it charges |
 |---|---|---|
-| Nothing. The order is fixed and each step consumes the last one's output | A chain of calls, one per step | Every call gets an easier job, so accuracy rises. Latency is the sum of the steps |
-| Which of a known set of categories this input belongs to | A classifying call in front of handlers written per category | Each handler is tuned for one case. A misclassification sends the request down the wrong branch |
-| Nothing, and the parts do not depend on each other | The parts issued at once and joined afterwards | Elapsed time falls toward the slowest part. Every part is still billed |
-| Nothing, but one pass is not trustworthy on its own | The same job run several times and the answers reconciled | Confidence from agreement. Cost scales with attempts |
-| Which subtasks the input even requires | A coordinating call that decides the split, workers that run it, a synthesis pass | Decomposition that fits the input. A coordinator you now have to govern |
-| How many rounds it takes to meet a written standard | A producing call and a critiquing call, looping | Measurable improvement per round, where criteria are explicit. Rounds without a cap |
+| Nothing. Order is fixed and every step feeds on the one before | A chain of calls, one per step | Each call is simpler, so accuracy improves. Total time adds up across steps |
+| Which known category the input falls into | A sorting call, then one handler per category | Handlers can specialise. A wrong label sends the request to the wrong handler |
+| Nothing, and the parts are independent | Start all parts together, merge afterwards | Wait time drops toward the slowest part. Every part is still paid for |
+| Nothing, but a single attempt is not reliable | Run the same job a few times and reconcile | Agreement builds confidence. Cost rises with each attempt |
+| Which subtasks the input needs at all | A coordinating call chooses the split, workers do it, a last pass combines | The split suits the input. You gain a coordinator to supervise |
+| How many rounds until a written standard is met | A call that makes, a call that critiques, repeated | Clear gains per round if the criteria are explicit. Rounds are uncapped unless you cap them |
 
-**The five names.** Those are **prompt chaining** (a recipe with ordered steps), **routing** (a host who sends each order to the right station), **parallelisation** in its two variants (several cooks working at once), **orchestrator-workers** (a head chef who splits the order), and **evaluator-optimizer** (cook and taster in a loop). Anthropic attaches a **selecting condition** to each one. The conditions are worth holding as **tests** rather than as descriptions.<sup>[1]</sup>
+These are **prompt chaining**, **routing**, **parallelisation** (in two flavours), **orchestrator-workers** and **evaluator-optimizer**. Anthropic states when each fits. Treat those statements as quick tests.<sup>[1]</sup>
 
-**What each one wants:**
-- **Chaining** wants a task that **splits cleanly into fixed subtasks**. It **trades latency for accuracy** by giving every call less to do.
-- **Routing** wants two things at once. The categories must **genuinely deserve separate handling**. And you need **classification you can trust** with the routing decision. Miss the second and the whole arrangement degrades, because a misrouted request gets handled well by the wrong specialist. Bad classification **poisons every branch**.
-- **Parallelisation** **splits on independence** when the goal is speed. It **repeats one job** when the goal is confidence.
-- **Evaluator-optimizer** wants written criteria and a demonstrable gain from another round. The honest signal that it fits: a **human articulating feedback** measurably improves the output.
+Chaining suits fixed subtasks. It spends a little time to buy accuracy, since each call carries less. Routing has two demands: categories that truly need different handling, and a sorter you can trust. A poor sorter gives a request expert care from the wrong expert, and that spoils every branch. Parallelisation splits work for speed or repeats a job for confidence. Evaluator-optimizer needs written criteria and proof that another round helps. A good hint: human feedback visibly improves the output.
 
-**The odd one out.** Orchestrator-workers sits on this chapter's boundary and is worth marking as such. The other four have their **control flow written down**. This one **hands the decomposition** itself to the model, because the subtasks **depend on the specific input** and cannot be fixed in advance. The **model decides the split**. Everything later in this chapter about coordination, **budgets and handoffs** starts applying the moment you choose it.
+Orchestrator-workers marks the chapter's edge. The other four keep control flow in code. This one lets the model split the work, because the subtasks depend on the input. It is the head chef reading today's orders and deciding who cooks what. Budgets and handoffs, below, apply once you pick it.
 
-**ELI5.** There are five kinds of recipe card. Pick the one that matches what the cook does not know yet. If the head chef has to decide how to split the order, that is the one where you must start watching the budget.
+**ELI5.** Different jobs need different kitchens. A line of cooks does fixed steps. A host sorts guests to tables. Many stoves cook at once. Ask what you do not know yet.
 
 ## An Agent Earns Its Cost Where Later Steps Depend on What Earlier Steps Find
 
-**First, the idea.** An agent is worth paying for when the next step cannot be known until you see what the last step found. That is the chef tasting the sauce and deciding what to add.
+Imagine debugging a system you have never opened. Autonomy exists for this. The reason is not difficulty. It is that nobody can script the investigation. What you check third depends on what the first two showed. The stack trace points at one module. You read it, rule out the obvious cause, and a new suspect appears. That next tool call exists only because of the last result. The path is found as you walk it. The head chef tastes, then reaches for salt.
 
-**The case autonomy was built for.** Debugging an **unfamiliar system** is the case **autonomy was built** for. The reason is **structural** rather than a matter of difficulty. Nobody can write that investigation down in advance, because the **third thing worth checking** depends entirely on what the **first two returned**. A stack trace points at a module. Reading the module **rules out the obvious cause** and raises a different one. The next tool call exists because of that result and would never have been chosen otherwise. The **path is discovered, not planned**.
+Keep this trait narrow. Adaptivity pays when step three exists only because of what step two found. Input that merely varies does not count. If the variations are a known list, you want routing.
 
-**The property to look for.** It is narrow. A **later step that exists** because of an **earlier finding** is what **adaptivity buys**. **Variability** in the input alone does not qualify. A known set of variations is a **routing problem**.
+The loop fits in a breath. The model gets the request, its standing instructions, its tool definitions and any history. It replies, or asks for a tool. The tool runs and hands back its output. This repeats until a reply carries no tool calls.<sup>[2]</sup> Each real result from the environment lets the next choice beat a guess.<sup>[1]</sup> No observable feedback means nothing to adapt to. Feedback is the fuel.
 
-**The loop.** It is short enough to hold in one sentence. The model is handed the request along with its **standing instructions** (the **system prompt**), its tool schemas (the descriptions of its tools) and whatever history exists. It either answers or asks for a tool. The tool runs and the result goes back. The **cycle repeats** until a response arrives carrying **no tool calls**.<sup>[2]</sup> In the kitchen, this is taste, adjust, taste again, until the dish is done.
+Scenarios probe this. The route now comes from a model reasoning over a growing pile of results, not from branches a reviewer can read. Normal logs fall short, because the key decisions sit in a transcript. Errors snowball, since a wrong turn at step four feeds step five. And nothing ends the loop unless you built a way to.
 
-**Feedback is the fuel.** **Ground truth from the environment** at each step is what makes the **next decision better than a guess**.<sup>[1]</sup> An agent on a task with **no observable feedback** has nothing to adapt to. A chef who cannot taste is just guessing.
+So build exits that do not rely on the model choosing to stop. The SDK offers two caps that work with or without its cooperation. One caps tool-use round trips. The other caps spend. Each reports its own error subtype, so your code can tell "done" from "cut off."<sup>[2]</sup> Anthropic likewise pairs autonomy with a maximum iteration count.<sup>[1]</sup> A run that hit its turn limit and one that finished look alike in a log holding only the final message.
 
-**What comes with the loop.** This is the part scenarios test:
-- The **route through the work** is now produced by the model reasoning over whatever has piled up. It is no longer **branching logic** a reviewer can read line by line.
-- **Operational logs stop being enough**, because the interesting decisions happen inside a **transcript**.
-- **Errors compound**. A **wrong turn** at step four is the input to step five.
-- The loop will **not stop on its own** unless you tell it how.
+Two named mistakes flank this, and both look like good engineering.
 
-**Exit conditions.** So **exit conditions** belong in the design. They must not depend on the **model volunteering to finish**. The SDK gives you **two caps** that hold without cooperation. One is a **ceiling on tool-use round trips**. The other is a **ceiling on spend**. Each returns its own **error subtype**, so your code can tell a finished task from a **truncated** one.<sup>[2]</sup> Anthropic pairs autonomy with a **maximum iteration count** for the same reason.<sup>[1]</sup> A run that stopped because it **ran out of turns** and a run that stopped because it was done look identical in a log that records only the last message.
+**Autonomy bought on a settled sequence** happens more often. Someone picks an agent because agents feel modern, for work a coworker could recite. Each run pays for a planning call that settles nothing and differs from the last. You bought only variance, like asking the head chef to improvise a dish that has a card.
 
-**Two named anti-patterns.** They sit either side of this. Both **read as competence**.
+The reverse is a **fixed checklist forced onto an investigation**. It assumes you know the order of inquiry. In unfamiliar territory you do not, so the assistant plods through irrelevant steps while the real clue sits untouched.
 
-- **Autonomy bought on a settled sequence** is the commoner one. Somebody reaches for an agent because agents are the interesting architecture, on a task whose steps a colleague could **recite from memory**. Every run pays for a **planning call that decides nothing**, and every run differs from the last with no gain in what the system can do. You **bought variance** and nothing else.
-- **A fixed checklist imposed on an investigation** is the mirror. It presumes the **order of inquiry is known**, which is precisely what an unfamiliar system denies. You watch an assistant march through irrelevant steps while the actual lead goes uninvestigated.
+Anthropic's starting advice: for many applications, one well-tuned call with retrieval and worked examples is plenty. Add structure only when the simpler shape clearly fails.<sup>[1]</sup>
 
-**Where to start.** Anthropic's advice is blunt, and it survives contact with production. **Optimising a single call** with retrieval and **worked examples** (sample answers placed in the prompt) is enough for many applications. Add structure only where the **simpler shape demonstrably fails**.<sup>[1]</sup>
-
-**ELI5.** A chef who tastes needs a timer, or they might keep fiddling forever. Use the tasting chef only when the next move depends on the last taste. If the steps are the same every day, a recipe card is cheaper.
+**ELI5.** A chef who tastes, then decides what to add, is an agent. A cook who adds the same thing every time is not. Give the chef a timer, or the tasting never stops.
 
 ## The Choice Is Made Per Path, So One System Can Hold a Chain and a Loop
 
-**First, the idea.** A single application can have more than one route through it. You pick recipe card or tasting chef for each route, not once for the whole restaurant.
+People argue as if a product is all chain or all agent. Real products rarely are.
 
-**Not one or the other.** The **two patterns** get argued as though a system has to be one or the other. **Most systems** that **reach production** are not.
+The test asks about a route through work, and one product can hold several routes. Take invoices. Ninety-odd percent arrive in a format someone already documented. They get the same extraction and validation each time, so a model choosing the order gains nothing. The rest are malformed. For those there is a true choice: return it, query the sender, or hand it to a person. You cannot know which until you see what is wrong.
 
-**The invoice example.** Look at what the enumeration test is actually asked about. It is a question about a **route through work**, and a **single application** routinely carries **more than one route** with different properties. Invoices are the clean case.
-- **Ninety-odd percent** of them arrive in a shape somebody has **already written down**. They move through the same extraction and the **same validation every time**. They would gain nothing from a **model choosing the order**.
-- The **remainder arrive malformed**. What happens next is a **real decision** among several live options: send it back, ask the submitter, escalate to a person. **Nobody can say in advance** which applies, because that depends on what the malformation turns out to be.
+Test each route alone and the answers are obvious. Test "the invoice system" as one lump and your answer is wrong for about half the traffic.
 
-**Test each route.** Run the test on **each route separately** and both answers are obvious. Run it once on "the invoice system" and whichever answer you get is **wrong for half the traffic**.
+The fitting design is coded steps for the settled route, plus a model-driven step only where the route forks unpredictably. Line cooks fill the usual orders and the chef takes the strange one. That is one rule used twice, not a halfway point, and it follows Anthropic's advice to start simple and add structure only where the simple shape clearly breaks.<sup>[1]</sup> "Breaks" is a fact about a path, not a product.
 
-**The shape that fits.** Use a **coded sequence for the settled route** (the recipe card). Add a **model-driven step** (the tasting chef) at the one point where the **route forks unpredictably**. That is not a compromise between two architectures. It is the **same rule applied twice**. It is also what Anthropic's own advice implies: **start simple**, and add structure only where the simple shape is demonstrably failing.<sup>[1]</sup> Demonstrably failing is a **property of a path**, not of a product.
+One pattern for everything is the error. That one decision causes both named mistakes. Choose the loop, and the settled route pays for planning on every invoice about a question never open. Choose the chain, and the odd invoice meets a branch nobody could write. Your logs usually show the traffic mix, so you can price each mistake.
 
-**The anti-pattern.** The **whole-system pattern choice** is the anti-pattern. It produces both of this chapter's **named errors at once** from a single decision.
-- Pick the loop, and the settled route **pays a planning call** on every invoice to decide something that was **never open**.
-- Pick the chain, and the exception **falls through a branch** nobody could write.
-
-The **traffic profile** tells you how much each mistake costs. It is usually in the logs already.
-
-**ELI5.** Most days the kitchen makes the same dish, so use the recipe card. Once in a while a strange order comes in, so call the chef for that one. Do not make everybody follow one way for everything.
+**ELI5.** Most invoices are plain, so a simple recipe handles them. A few are odd, so a clever helper looks at just those.
 
 ## A Coordinator Owns the Budget, the Validation and the Contract at Every Handoff
 
-**First, the idea.** When one agent splits work among others, it becomes a coordinator. In the kitchen, that is the **head chef** (the **coordinator**, also called the orchestrator) handing orders to **station cooks** (the **subagents**, or workers). The head chef is responsible for the budget, for checking the plates, and for what each handoff must contain.
+A **manager or supervisor hierarchy** has one agent that cuts a request into parts and passes each part to a specialist. Picture the head chef passing tickets to the grill, pastry and salad stations. Every specialist gets a private conversation, a tool list, and a history that only it reads. On the managed platform each agent has its own model, system prompt, tools, connected servers and skills, and runs in a context-isolated thread with its own event stream. Tools, servers and context are shared with nobody.<sup>[3]</sup>
 
-**What the hierarchy is.** A **manager or supervisor hierarchy** is one agent that **decomposes a request** and **delegates the pieces** to specialists. Each specialist holds a **separate conversation** (its own station), a tool list of its own, and a **history nobody else reads**. The managed-agent surface makes it concrete. Every agent carries its own model, system prompt, tools, connected servers and skills. Each runs in a **context-isolated thread** with its own event stream. Tools, servers and context are **shared with nobody**.<sup>[3]</sup>
+Three facts decide scenarios, and none shows in a diagram.
 
-**Three properties decide scenarios.** None of them shows up in a diagram.
+Delegation goes one level deep. A coordinator calls agents on its roster. An agent that is itself a coordinator cannot join that roster, and adding one fails validation.<sup>[3]</sup> The depth limit is configured, so the tree stays shallow by design. The SDK has a depth cap too. It defaults to three layers below the main conversation and can be set down to none.<sup>[4]</sup>
 
-1. **Delegation goes one level.** A coordinator calls the agents on its roster. An agent that is itself a coordinator cannot go on that roster. The attempt **fails validation**.<sup>[3]</sup> Depth is a **configured limit** rather than an open tree, so the hierarchy stays **shallow by construction**. The SDK exposes the same idea as a **depth cap**, **three layers** below the main conversation by default and **settable down to none**.<sup>[4]</sup>
-2. **Threads persist.** A coordinator can send a **follow-up** to an agent it already used. That agent still holds everything from its **earlier turns**.<sup>[3]</sup> Delegation is **not necessarily one-shot**, which is what makes a **review loop** possible.
-3. **Spend is pooled.** A **session budget** is a **single cap** shared across every thread. Threads **pause independently** as it is reached.<sup>[3]</sup> On the SDK side, subagent spend counts toward the query total. Once the cap is hit, the **next spawn fails** outright.<sup>[2]</sup>
+Threads persist. A coordinator can send a follow-up to an agent it used earlier, and that agent still remembers its previous turns.<sup>[3]</sup> So delegation need not be one shot, which is what lets a review loop exist.
 
-**The failure mode.** This is the one the exam tests hardest. **Delegation without governance** is an orchestrator that **hands out work** and **accepts whatever comes back**. It looks like an architecture and behaves like a **mailing list**. Here is what goes wrong:
-- Subtasks return in **incompatible shapes**.
-- One worker's **malformed output** becomes the next stage's input.
-- Contradictions between workers **never get reconciled**.
-- The first human to notice is a user reading the final answer.
+Spend is pooled. One session budget covers every thread, and each thread pauses on its own when the cap arrives.<sup>[3]</sup> In the SDK, what subagents spend counts toward the query total. After the cap is hit, the next spawn fails.<sup>[2]</sup>
 
-**Nothing checked anything** on the way.
+Now the failure the exam leans on most. **Delegation without governance** is a coordinator that hands out tasks and takes back whatever arrives. It behaves like a mailing list. Answers come in clashing formats. One worker's broken output feeds the next stage. Workers disagree and nobody resolves it. A user reading the final answer spots the problem first.
 
-**The repair.** It is **enforcement at the point of handoff**, in three parts:
-- A **budget per subagent**, so no single worker can consume the run.
-- Validation of each result against a **defined shape** before it moves on, so a malformed return stops where it was produced.
-- An **explicit contract per handoff**, so both sides agree what a **finished subtask** contains.
+The cure is to enforce rules at each handoff, in three parts. Give every subagent its own budget, so one worker cannot drain the run. Check each result against a defined shape before passing it on. And write a contract for every handoff, so both sides agree what "finished" holds.
 
-**Alternatives that fail.** Two plausible ones fail for reasons worth naming:
-- **Retries plus a shared trace** improve recovery and make the **postmortem easier**. But they **intercept nothing** on the way downstream, which is precisely the failure described.
-- Letting workers see each other and **negotiate their differences** asks them to settle contradictions among themselves. It **deletes the component** whose job that was.
+Three substitutes fall short. Retries with a shared trace help recovery but block nothing flowing downstream. Letting workers argue it out removes the coordinator whose job that was. Folding everything into one call throws away the isolation and parallelism the design was built for.
 
-**Collapsing** everything back into **one call** is the third. It **abandons the isolation** and the parallelism you built the architecture for, rather than managing them.
+Good assignments are the other half of the job. Anthropic's research system found that terse instructions made agents misread the task or run the same searches twice. The fix was to give each subtask an objective, an output format, advice on tools and sources, and boundaries marking where to stop.<sup>[5]</sup> The coordinator's prompt also says how much effort a question merits. A plain lookup needs one agent and a few tool calls. Broad research gets many more.<sup>[5]</sup> Without that rule the system launched dozens of agents for questions one could answer.
 
-**Delegation detail.** This is the other half of what a coordinator owns. Anthropic's research system found that subtasks handed out as **short instructions** produced agents that **misread the assignment** or **repeated each other's searches**. The repair was to give every subtask four things:
-- an **objective**
-- an **output format**
-- guidance on which **tools and sources** to use
-- **boundaries** saying where it stops<sup>[5]</sup>
-
-**Effort scaling.** That system also encodes how much **effort a query deserves**, directly in the **coordinator's prompt**. A **simple lookup** gets one agent and a handful of tool calls. Genuinely broad research gets many more.<sup>[5]</sup> Without the scaling rule, the observed behaviour was **dozens of agents spawned** for questions that needed one.
-
-**ELI5.** The head chef hands out orders, but must also check every plate before it leaves. Each station gets a small food budget and a clear order ticket that says what a finished plate looks like. If the head chef just accepts whatever comes back, bad plates reach the customer.
+**ELI5.** A head chef who hands out tickets must set each station's budget and taste every plate. Each ticket says what a finished dish looks like. Otherwise stations send out anything.
 
 ## Fifteen Times the Tokens of a Chat, and Parallel Exploration Is What Buys It Back
 
-**First, the idea.** Many cooks cost a lot more than one. It is only worth it when the work really splits into parts that can happen at the same time.
+The published figures are big. An agent burns about four times the tokens of a chat. A multi-agent system burns about fifteen times.<sup>[5]</sup> Each worker keeps its own context and spends its own tokens in it, so the cost hits both input and output. Every context gets billed.
 
-**The numbers.** They are published and they are not small. An agent uses roughly **four times the tokens** of a chat interaction. A **multi-agent system** uses roughly **fifteen**.<sup>[5]</sup> Every worker (every station) **holds its own context** and spends its own tokens against it. So the multiplier lands on input and output alike. Every **context is paid** for.
+See what that money bought. One setup used Claude Opus 4 as lead and Claude Sonnet 4 as workers. On an internal research eval it beat a lone Claude Opus 4 by 90.2%. Anthropic's analysis credits token spend for most of the performance variance.<sup>[5]</sup> So the design mostly wins by buying more parallel computation. That gain is real, and it is what the invoice pays for.
 
-**What it bought.** Set that beside what the architecture delivered. A system running Claude **Opus 4 as the lead** with **Claude Sonnet 4 workers** beat a single-agent Claude Opus 4 baseline by **90.2%** on an internal research eval. Anthropic's analysis attributes most of that **performance variance** to **token spend**.<sup>[5]</sup> The shape works largely because it buys more **parallel computation**. That is a real gain. It is also the **whole invoice**.
+Pay only under narrow conditions. Fan-out earns its multiplier when work splits into parts nobody waits on: many separate sources, material bigger than one context window, or many complex tools.<sup>[5]</sup> It is ruled out when all agents need the same context, when pieces lean on each other, and for most coding, where each step uses the previous result.<sup>[5]</sup> Moving context between agents costs about as much as acting on it.<sup>[6]</sup>
 
-**When fan-out earns it.** The qualifying condition is narrow. **Fan-out** (splitting work across many workers at once) **earns the multiplier** on work that genuinely splits into parts nobody has to wait on:
-- research across many **separate sources**
-- material **larger than one context window**
-- a surface with **many complex tools**<sup>[5]</sup>
+The classic misuse is **fan-out on a dependent chain**, often sold as a speed fix. Something runs slow, so it is cut across parallel workers. Time barely improves, since the pieces always waited on each other. Cost multiplies. Slicing a sequence never makes it parallel. You get a sequence spread over more contexts.
 
-**When it does not.** The disqualifying conditions are just as specific:
-- tasks where every agent needs the **same context**
-- domains with **heavy dependencies** between the pieces
-- **most coding work**, where each step consumes the last one's result and there is little left to explore in parallel<sup>[5]</sup>
+One cost sits outside the arithmetic. Each new worker is another place the run can break. The retry-or-give-up rule, the backoff and the fallback must be wired into every worker. One worker hitting a rate limit with no backoff can hold the compilation step open while the coordinator waits for a reply that never comes. Orchestration multiplies failure handling.
 
-Later Anthropic research sharpens the edge. **Moving context between agents** costs about as much as acting on it. So coordination is **nowhere near the cheap part** of the design.<sup>[6]</sup>
+Two levers cut the multiplier. Put a capable model on the coordinator and cheaper ones on the workers, so you skip top rates in every parallel context. And keep the roster honest. Independent agents given truly separate ground have returned largely different findings, which is what the split is for.<sup>[6]</sup> Workers who overlap duplicate each other's spend.
 
-**The anti-pattern: fan-out on a dependent chain.** It usually arrives as a **latency fix**. Work that ran slowly gets split across **parallel workers**, on the reasoning that simultaneous work finishes sooner. **Elapsed time barely moves**, because the pieces were waiting on each other all along. The **bill multiplies**. Splitting a sequence does **not make it parallel**. You get a sequence with more contexts in it. In the kitchen, hiring ten cooks does not help if each one has to wait for the sauce before they can start.
-
-**A control cost the arithmetic does not show.** Every worker you add is another point at which the **run can break**. The **retriable-versus-terminal decision** (is this error worth trying again, or is it final), the backoff (waiting before a retry) and the fallback all have to be **wired into each one separately**. Say a single worker meets a **rate limit** with nothing to back off with. It can hold the compilation step open while the coordinator waits for a return that never arrives. Orchestration does **not replace failure handling**. It **multiplies the work**.
-
-**Two levers.** They reduce the multiplier without abandoning the shape:
-- Run the coordinating agent on a **capable model** and the **workers on cheaper ones**, so top-tier rates are not paid across every parallel context.
-- Keep the **roster honest**. Independent agents pointed at **genuinely separate territory** have been observed returning **largely different findings**, which is the return the split was supposed to produce.<sup>[6]</sup> **Overlapping workers** are **money spent twice**.
-
-**ELI5.** More cooks means more groceries and more wages. It pays off only when the cooks can work at the same time on different things. If every cook has to wait for the one before, you just pay more for the same slow dinner.
+**ELI5.** Ten cooks use ten times the groceries. That pays off only if they cook ten different dishes at once. If each waits on the one before, you spent more and finished at the same time.
 
 ## A Subagent Starts Empty, So Whatever the Next Stage Needs Has to Be Written Into the Prompt
 
-**First, the idea.** Each station cook starts with an empty counter. They know only what is written on the order ticket. If the head chef forgets to write something on the ticket, the cook never learns it.
+Isolation makes delegation worth it, and wrecks handoffs when forgotten.
 
-**Isolation cuts both ways.** **Isolation** is the property that makes **delegation useful**. It is also the property that **breaks handoffs** when a designer forgets it holds.
+Say you launch a subagent that is not a fork. It begins with a blank page. Its only link to the parent is the prompt string you pass at launch. File paths, error messages and past decisions reach it only because someone typed them in.<sup>[7]</sup> Nothing is inherited. Coming back, the child's tool calls and results stay inside it, and just its final message returns.<sup>[7]</sup> A worker may read dozens of files while the caller's window grows by one summary. Chapter 7 covers that as a context technique. The design lesson: nothing crosses in either direction unless something carries it. A note through a kitchen hatch carries only what is written on it.
 
-**What crosses the boundary.** A **subagent** that is **not a fork** begins with **no parent conversation**. The only content crossing from parent to child is the **prompt string** (the order ticket) on the call that launched it. File paths, error text and decisions already taken are present because **somebody put them** there.<sup>[7]</sup> **Nothing arrives by inheritance**. Going the other way, intermediate tool calls and results stay inside the child. Only its **final message returns**.<sup>[7]</sup> A worker can read dozens of files and the caller's window **grows by a summary**. Chapter 7 owns that trade as a context technique. Architecturally what matters is the consequence: **nothing crosses unless something carries** it, in either direction.
+Rules carry over unevenly. Skills do not travel with a delegated task, so a worker needing them must have them registered. Permission scope does travel across the boundary unchanged. Project-level context files load. The parent's conversation, its invoked skills and its already-read files do not.<sup>[8]</sup> A standing preference stated once in the main chat must be repeated in the delegation prompt.
 
-**Constraints inherit unevenly.** That is where a design gets caught.
-- **Skills do not carry** over to a delegated task. A worker depending on a specific instruction set needs it registered against that worker.
-- **Permission scope does carry** over and is not reset at the boundary.
-- **Project-level context files load**. The parent's own conversation, its invoked skills and its already-read files do not.<sup>[8]</sup>
-- A **standing preference** you stated once in the main conversation has to be **restated in the delegation prompt** to reach the agent doing the work.
+So record handoffs and do not narrate them. The stage that sees a detail writes it down. A later stage cannot rebuild a line range nobody kept. Suppose a coordinator gathers three workers' findings and asks a final stage to attribute each claim to a file. It never saw those facts, so it guesses, and a claim lands on the wrong file. The cure is a structured record made at the moment of observation: path, symbol, line range and the snippet that proves it.
 
-**Record, do not narrate.** Handoffs get **recorded rather than narrated**. The stage that **observes a detail** is the stage that **writes it down**, because no later stage can recover a **line range nobody kept**. Say a coordinator collects three workers' findings and asks a synthesis stage to **attribute claims to files**. It is asking for facts that stage never saw. Guessing is where a claim gets attached to the wrong file. The repair is a **structured record** produced at the **point of observation**: path, symbol, line range, and the snippet standing as evidence.
+Two weak alternatives show why. **Concatenation passed off as integration** hands the last stage every transcript with no structure, so credit gets worked out twice. **Regular expressions over summaries** extract only what a summary happened to mention, so every gap reads as "no findings."
 
-**Two named alternatives that fail instructively:**
-- **Concatenation offered as integration** hands the synthesiser every transcript and **imposes no structure** at all. Attribution then gets worked out a **second time downstream**, when it was free the first time.
-- **Regular expressions over summaries** extract whatever a summary happened to mention. Every **omission stays omitted** and reads as an absence of findings.
+Ordering needs similar care. Say a report stage starts before its source stage finishes. It writes claims no one can check. Of three fixes, one works. Pruning afterwards leaves a report shaped by unverifiable claims. Telling the stage to wait asks it to see a state it cannot see. Hunting for a word like "done" in the text is guessing from prose. The working fix is to block the downstream stage on an explicit signal the producing stage sets: a status plus a structured manifest of what it made.
 
-**Sequencing between stages.** It needs the same treatment. A report stage that **runs before its source stage** has finished produces **claims nobody can check**. Three repairs suggest themselves while only one works:
-- **Generating first and pruning afterwards** leaves a report whose shape was set by claims that could never be checked.
-- Asking the report stage to hold off requires it to observe a state it cannot see.
-- Scanning a message for the right words reads **done-ness out of prose**.
+Coverage follows the same logic. If output reads well but one region is thin, more effort aimed the same way re-samples the same blind spot, and a higher fixed iteration count spends more with no aim. What helps is a check against the intended scope, plus a way to act on gaps. A coordinator review names the thin region, sends follow-up work there, and reruns the synthesis. Hosted sessions formalise this as an outcome with a rubric. A grader scores the artifact in a separate context window, so the implementer's choices cannot sway it, and its explanation goes back for the next round.<sup>[9]</sup>
 
-The one that works is to **block the downstream stage** on an **explicit signal the producing stage sets**. That signal is a status plus a **structured manifest** (a list) of what it produced. The ordering then rests on a fact.
-
-**Coverage.** It is the same argument one level up. Say output reads coherently but **one region is thin**. More effort aimed the same way **re-samples the same blind spot**. A **higher fixed iteration count** spends more without pointing it anywhere. Effort has to be aimed. What closes a gap is an explicit **check against the intended scope**, plus a route for acting on whatever it finds missing. That means a coordinator review that **names the thin region**, **dispatches follow-up work** at it, and **reruns the synthesis**.
-
-**Outcomes and graders.** Hosted sessions formalise this as a **defined outcome** with a rubric. A **grader** evaluates the artifact in a **separate context window**, precisely so the implementation choices it is judging cannot influence it. Its explanation goes back for the next round.<sup>[9]</sup>
-
-**ELI5.** A station cook only knows what is on the order ticket. If a detail matters, write it on the ticket, and have each cook write down what they saw as they saw it. Do not hope the next person remembers.
+**ELI5.** A helper sent to the pantry knows only what is on your note, and comes back with one answer. So write the note well, and make them jot down what they find.
 
 ## Memory Is a Design-Time Decision About What Survives the Session
 
-**First, the idea.** When a session ends, everything the agent learned ends with it, unless you saved it somewhere. In the kitchen, the question is what goes into the **notebook** (the **memory**) that the next shift can read.
-
-**Memory scope.** An agent loop ends and everything it accumulated ends with it. What the next session knows is a choice you make at **design time**. Call that choice the agent's **memory scope**. The two ways of getting it wrong pull in **opposite directions**:
-- Too much state carried in the conversation **inflates every call**, because the whole history gets **re-read on every turn**.
-- Too little written down anywhere **strips the agent of continuity**. **Whatever nobody recorded** is gone the moment the **session closes**.
+When the loop ends, whatever the agent gathered ends with it. What the next session knows is your choice up front. Call it the agent's **memory scope**. Errors go two opposite ways. Keep too much in the conversation and every call grows heavy, since the full history is re-read each turn. Record too little and the agent has no continuity, because whatever nobody saved vanishes at session close.
 
 | Scope | What is still there next session | What it costs | What it drops |
 |---|---|---|---|
-| Held in the conversation | Nothing. State survives turns, not restarts | No retrieval work; token cost grows with every turn | Everything, on a new session or a clear |
-| Written to external storage | Whatever was written, readable across sessions, users and instances | Retrieval latency, plus the read and write logic to maintain | Nothing on the persistence side |
-| Condensed and reinjected | A summary of the prior conversation | Less per session than replaying history in full | Any detail the summariser did not think to keep |
-| Nothing kept | Nothing, by design | No overhead at all | Everything from earlier sessions |
+| Held in the conversation | Nothing. State lasts across turns, not restarts | No lookup work. Token cost climbs each turn | Everything, on a new or cleared session |
+| Written to external storage | What was written, readable across sessions, users and instances | Lookup delay, plus code to read and write | Nothing on the saving side |
+| Condensed and reinjected | A summary of the earlier talk | Less per session than replaying it all | Any detail the summary missed |
+| Nothing kept | Nothing, on purpose | No extra work | All earlier sessions |
 
-**The trap.** The first row **prototypes beautifully**. History goes in the message list, the list goes up on every call, and it works for a while. Then **cost scales with session length** and **latency climbs** as the window fills. The fix is a refactor that is mechanically simple and arrives at the **worst possible moment**: under production pressure, on a deadline already running. **Deciding at design time** costs an afternoon. Deciding under **pressure costs a release**.
+The first row feels great in a prototype. History sits in the message list and goes out on every call. Then cost grows with session length and delay rises as the window fills. The cure is a refactor that lands at the worst time, under production pressure. Deciding early costs an afternoon. Deciding late costs a release.
 
-**How the managed platform does it.** The managed platform gives the external row a documented shape. A **memory store** is a collection of documents **mounted into the session** as a directory (the notebook on the shelf). The agent reads and writes it with the **same file tools** it uses for everything else. A note in the **system prompt** says where to look. Every change creates an **immutable version**, so you get an **audit trail** and a **point-in-time recovery** path. Access can be **granted read-only** where a session should consume **shared reference material** without adding to it.<sup>[10]</sup>
+The managed platform gives external storage a concrete form. A memory store is a folder of documents attached to the session. The agent uses its normal file tools on it, and a line in the system prompt says where it is. Every edit saves an immutable version, so you get an audit trail and point-in-time recovery. Read-only access suits sessions that should use shared reference notes but not change them.<sup>[10]</sup>
 
-**Resumability.** It separates memory from persistence proper, and it is a different requirement rather than a stronger one. Say a task runs for half an hour with **defined intermediate points**. It needs state that **outlives the process** computing it, so an interrupted run reloads from the **last completed point** instead of starting over.
-- A **longer timeout makes interruption rarer** without making it **survivable**.
-- A **duplicate copy** running alongside **doubles the cost** and loses both to any interruption they share.
+**Resumability** is a different need from memory, not a bigger one. Picture a half-hour task with defined intermediate points. Its state must outlive the process doing the work, so a broken run reloads from the last finished point. A longer timeout makes breaks rarer but not survivable. A duplicate copy running beside it doubles cost, and a shared interruption kills both. Anthropic agrees. Restarts are expensive, so it pairs the model's flexibility with deterministic retry logic and regular checkpoints, letting a run resume where the error hit.<sup>[5]</sup>
 
-Anthropic reaches the same conclusion operationally. **Restarts are expensive**, so the answer pairs the model's adaptability with **deterministic retry logic** and **regular checkpoints** that let a run resume from where the error hit.<sup>[5]</sup>
-
-**ELI5.** When the shift ends, the cook forgets everything unless they wrote it in the notebook. Writing everything in the notebook takes time to look up. Writing nothing means starting over each day. Decide what goes in the notebook before the restaurant opens, not in the middle of a rush.
+**ELI5.** When the day ends, the helper forgets everything unless it is in a notebook. Decide up front what goes in. A notebook also lets the helper continue after the lights go out.
 
 ## A Framework Wraps the Same Loop and Charges in Visibility
 
-**First, the idea.** An agent framework is like a **meal kit**. It comes with the common parts already done, so you do less work. But you cannot see exactly what is in each bag.
+**Agent frameworks** exist because everyone keeps rebuilding the same loop. Strands, LangGraph and PydanticAI belong to a group that includes Anthropic's own SDK. They cover the identical parts of every build: calling the model, defining and parsing tools, chaining calls.<sup>[1]</sup> Nobody should write those twice.
 
-**What frameworks are for.** **Agent frameworks** exist because the loop has a **shape everybody rebuilds**. Strands, LangGraph and PydanticAI belong to a category that also holds **Anthropic's own SDK**. The category earns its place by handling the parts that are **identical in every implementation**: calling the model, defining and parsing tools, chaining calls together.<sup>[1]</sup> Nobody should **write those twice**.
+The price is what you can see. Such layers can bury the prompts and responses below them, so debugging gets harder, and mistaken beliefs about what lies beneath cause many bugs. Anthropic's advice is to begin with the model API directly, since many patterns need only a few lines.<sup>[1]</sup> If you use a framework, learn what is inside. Removing layers on the way to production is a normal path, not a retreat.
 
-**What they charge.** What they **charge is visibility**. Anthropic is direct about the tradeoff:
-- Those layers can **obscure the prompts and responses** underneath, which makes debugging harder.
-- **Wrong assumptions** about what sits below the abstraction are a **common source of error**.
-- The recommendation is to start against the **model API directly**, because many of these patterns run to a few lines of code.<sup>[1]</sup>
+A deeper question sits under that one: who runs the loop? With the **Messages API** you own each iteration and each exit. An SDK runs that loop inside your process and supplies tool execution and iteration structure. A hosted agent service runs loop and sandbox on its side. You define the agent once as a versioned resource, events flow in from your app, and results stream back.<sup>[11]</sup> Chapter 13 covers that choice and what you hold on each path.
 
-Use a framework and you should **understand its internals**. Moving into production, **reducing abstraction** is a legitimate direction of travel rather than a regression.
+All three share one fact. A framework settles how much of the loop someone else maintains. It has no view on whether the task needed a loop at all. A scale point makes the same argument. When orchestration outgrows one conversation, the plan can move into a script the runtime runs. The branching and in-between results stay out of every context window, and the conversation sees only the finished answer.<sup>[12]</sup> That is the enumeration test again, pointed at the coordination.
 
-**Who runs the loop.** Underneath the framework question sits a different one. There are three answers:
-- Write it against the **Messages API** and you own every **iteration and every exit condition**.
-- An SDK runs the same loop **inside your process** and supplies tool execution and iteration structure.
-- A **hosted agent service** runs the loop and the sandbox elsewhere. The agent is defined once as a **versioned resource**, and events go in from your application while **results stream out**.<sup>[11]</sup>
-
-Chapter 13 owns that choice and what each path leaves you holding.
-
-**What holds across all of them.** A framework decides how much of the loop **somebody else maintains**. It has **no opinion** about whether the task **needed a loop** at all. A meal kit does not tell you whether you needed to cook.
-
-**One scale point.** It is worth carrying, because it is the same argument in different clothes. When orchestration grows past what a **single conversation can coordinate**, you can move the **plan into a script** that the **runtime executes**. That keeps the **branching and the intermediate results** out of every context window. The conversation receives only the **finished answer**.<sup>[12]</sup> That is the **enumeration test** again, aimed at the coordination rather than at the task.
-
-**ELI5.** A meal kit saves you from chopping the same onions every time, but you cannot always see what went in. Use it if you know what is inside. And a kit never tells you whether you needed to cook at all.
+**ELI5.** A kitchen gadget saves time but hides what it does to the food. When the dish tastes odd, you cannot tell why. Learn how it works.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on the exam are real designs that real teams have built. They go wrong because of one hidden assumption. Learn the four assumptions and you can spot them.
+The wrong options here name designs that exist. Teams ship each one, so scanning for nonsense finds nothing. Four hidden assumptions cover almost all of them.
 
-**Why they are hard to spot.** Wrong answers here **name real architectures**. None of them is stupid. Every one describes something a **competent team has shipped**, which is why reading for **obvious nonsense finds nothing**. What separates them is a **single assumption underneath**. **Four assumptions** produce nearly all of them.
+- **Autonomy offered where the sequence was already settled.** The option lets the model plan, though the scenario calls the steps repeatable, fixed or hand-run. It spends a model call on something already decided. It turns correct only if the path depends on earlier findings.
+- **Isolation assumed away, or bought and discarded.** Some options let agents share a chat, pass every old message to every agent, or remove the coordinator. Each denies what makes delegation worth the cost. At a handoff, the question is what actually gets passed, never whether a fact can be seen.
+- **Coordination swapped for watching, bargaining or tidying.** Tracing, retries and dashboards let bad output flow on. Peer settlement hands workers a conflict the coordinator exists to resolve. Generating then pruning leaves a structure built on claims that never held. Each is a real practice aimed one step off the failure.
+- **Capacity or effort offered where structure is the problem.** A bigger window for tangled sub-problems that already fit. A higher iteration count for a coverage gap that more of the same effort re-samples. A longer timeout for interruptions that must be survived. Name what an option changes, then check the scenario cared about that.
 
-**The four wrong assumptions:**
-- **Autonomy offered where the sequence was already settled.** The option lets the **model plan a path**, on a scenario describing steps as **repeatable**, fixed, or **already run by hand**. It is **not a weaker answer** than the chain. It **pays a model call** to decide something the scenario **stated as decided**. It becomes correct only when the scenario says the **path depends on what earlier steps find**.
-- **Isolation assumed away**, or **paid for and then discarded.** These are options that treat **separate agents** as **sharing a conversation**, that **forward every prior message** to every agent, or that **delete the coordinating component**. All three deny the property that makes **delegation worth its cost**. The **design question** at a handoff is never whether a **fact is visible**. It is what **gets passed**.
-- **Coordination replaced by observation**, by **negotiation**, or by **cleanup.** **Tracing, retries and dashboards** intercept **nothing on the way downstream**. **Peer-to-peer reconciliation** asks workers to settle **contradictions the coordinator exists** to settle. **Generating output** and **pruning it afterwards** leaves the structure shaped by **claims that never held**. Each is a **real practice aimed** one step away from the stated failure.
-- **Capacity or effort offered** where **structure is the problem.** Examples are a **larger window** against **interleaved sub-problems that already fit**, a **higher iteration count** against a **coverage gap** that more of the same effort will **re-sample**, and a **longer timeout** against **interruptions that need surviving** rather than avoiding. **Name the quantity the option changes**, then check whether the scenario named that quantity.
-
-**Match on what the scenario** is doing rather than on the **industry it is dressed** in.
+Match on what the scenario does, not the industry it wears.
 
 | When the scenario says | The answer is usually | The trap is usually |
 |---|---|---|
-| The steps are repeatable, known, or already run by hand | A fixed sequence of prompts, one per step | Letting the model plan a route that is already decided, or randomising it |
-| The correct path is unknown at the start and depends on what is found | Planning that adapts to each discovery, carrying findings forward | A fixed checklist, ignoring intermediate results, or restarting when a lead dies |
-| One system holds a stable-rule workload and an open-ended one | Different structures, split on whether the next step is known in advance | One structure imposed on both, in either direction, or one large prompt for everything |
-| Findings reach a later stage attached to the wrong file, or missing detail | A structured record written where the observation was made | Concatenating transcripts, pattern-matching summaries, or asking the last stage to reconstruct it |
-| A later stage runs before an earlier one has finished | Block it on an explicit status and manifest the producing stage sets | Inferring completion from prose, or generating first and pruning after |
-| A top component interprets requests and subordinates keep their own histories and tools | A coordinator with per-subagent isolated context | Reading it as one shared history, as a pipeline, or as retrieval from an index |
-| Workers return contradictory or malformed output that moves downstream anyway | Per-worker budgets, schema validation before the handoff, explicit contracts | Retries plus a shared trace, peer negotiation, or collapsing to a single call |
-| One request interleaves several unrelated sub-problems and progress gets lost | One worker per sub-problem, with completion tracked by the coordinator | A larger window, or asking the agent to keep its own running tally |
-| Output is coherent but one region of the material is thin | A coverage check against what should be there, plus targeted follow-up work | Repeating the broad assignment, raising the iteration count, or hiding the thin section |
-| Subtasks have different success criteria and one may hand work back | A state-driven structure with defined transitions between subtasks | A linear chain with no return path, or one loop holding every tool |
-| A task runs for tens of minutes and has named intermediate points | State persisted at each point and reloaded when the run resumes | A longer timeout, or a duplicate copy running in parallel |
-| Cost multiplied after a fan-out and the answers barely improved | Check whether the pieces were ever independent; a single agent may fit | Treating parallel workers as a latency fix, or adding more of them |
-| One flow has a routine majority and a small unpredictable remainder | A coded sequence for the routine path, with the model invoked only where it forks | Any option choosing one pattern for the whole system, in either direction |
+| Steps are repeatable, known, or done by hand already | A fixed run of prompts, one per step | A model-planned route that is settled, or a shuffled one |
+| The right path is unknown at the start and hangs on findings | Planning that adapts per discovery and carries findings along | A fixed checklist, dropped interim results, or a restart when a lead dies |
+| One system has a stable-rule job and an open-ended job | Separate structures, split on whether the next step is known ahead | One structure for both, either way, or one giant prompt |
+| Findings reach a later stage under the wrong file, or lose detail | A structured record made where the observation happened | Pasted transcripts, pattern-matched summaries, or a last stage that rebuilds it |
+| A later stage starts before an earlier one finishes | Block it on a status and manifest the producing stage sets | Guessing completion from prose, or generating first and pruning later |
+| A top component reads requests and subordinates keep their own histories and tools | A coordinator with isolated context per subagent | One shared history, a pipeline, or an index lookup |
+| Workers return clashing or malformed output that flows on anyway | Per-worker budgets, schema checks before handoff, explicit contracts | Retries with a shared trace, peer negotiation, or one call |
+| One request mixes unrelated sub-problems and progress gets lost | A worker per sub-problem, with the coordinator tracking what is done | A larger window, or an agent keeping its own tally |
+| Output is coherent but one area of the material is thin | A coverage check against what should exist, plus targeted follow-up | Repeating the broad task, a higher iteration count, or hiding the thin part |
+| Subtasks have different success criteria and one may send work back | A state-driven structure with defined moves between subtasks | A straight chain with no way back, or one loop holding every tool |
+| A task runs tens of minutes and has named intermediate points | State saved at each point and reloaded on resume | A longer timeout, or a duplicate copy beside it |
+| Cost multiplied after a fan-out and answers barely improved | Check if the pieces were ever independent. One agent may fit | Calling parallel workers a speed fix, or adding more |
+| One flow has a routine majority and a small unpredictable rest | Coded steps for the routine path, model called only at the fork | Any one pattern for the whole system, either way |
 
-**A habit that does more than the table.** Before comparing options, name what the scenario says is unknown when the run begins, and what it says is already settled. Almost every wrong answer here moves a decision to the wrong side of that line.
+One habit beats the table. List what the scenario leaves unknown and what it settles. Nearly every wrong answer puts a decision on the wrong side.
 
-**ELI5.** Wrong answers sound like good kitchen ideas, but they fix the wrong thing. Ask two questions. What does the cook not know yet? What is already decided? A wrong answer lets a chef re-decide something the recipe card already settled, or hands a fixed card to a problem that needs tasting.
+**ELI5.** Wrong answers sound like real kitchens. Ask what the cook already knows and what the cook cannot know yet. A wrong answer puts the thinking in the wrong place.
 
 ## What to Remember
 
-- The **enumeration test**: can the **sequence of steps** be **written down before the input arrives**? If it can, **code holds the plan** and the model works inside each step. If it cannot, the **model holds the plan** and **code holds the limits**: turn caps, spend caps, validation.
-- **Workflows run models and tools** along **paths fixed in code**. An **agent directs its own process** and decides how the task gets done. Same model, same tools, different owner of the next decision.
-- **Five workflow shapes**, each **selected by what the run does not know**: **chaining** for a fixed ordered split, **routing** for known categories needing separate handling, **parallelisation** for independent parts or for repeated attempts, **orchestrator-workers** when the subtasks themselves depend on the input, **evaluator-optimizer** when criteria are written down and another round measurably helps.
-- **Adaptivity is warranted** only where a **later step exists** because of what an **earlier one found**, which is why an unfamiliar system is the canonical case. **Variable input alone is a routing problem**, not a reason for autonomy.
-- An **agent loop does not stop on its own**. Exit conditions belong in the design, enforced by a **maximum turn count and a spend ceiling** returning distinct error states, never by the model choosing to finish.
-- A **coordinator owns budget, validation and the handoff contract**: a **spend limit per worker**, **each result checked** against a **defined shape before it moves** on, and an **agreed definition of a finished subtask**. **Tracing and retries** intercept **nothing on the way downstream**, and **peer negotiation deletes the component whose job** it was.
-- **Delegated subtasks need an objective**, an **output format**, **named tools and sources**, and a **boundary**. Short instructions produce workers that misread the assignment or repeat each other's work.
-- A **multi-agent system costs roughly fifteen times a chat** and an **agent roughly four**, because every **worker spends its own tokens** on its **own context**. The multiplier is bought back **only by genuine parallel exploration**: separate sources, material larger than one window, many tools. **Tightly coupled work pays the fan-out** and collects **no parallel benefit**.
-- **Fan-out multiplies failure sites**, so **retry, backoff and fallback** apply to each **worker separately**. One stalled worker can hold the synthesis step open indefinitely.
-- A **subagent starts with no parent conversation**: the **launching prompt is the only channel** in, and **only its final message returns**. **Skills do not carry** over to a delegated task, while **permission scope** does.
-- **No later stage** can **recover a fact nobody recorded**, so **whichever stage sees a detail writes it down**: **path, symbol, line range, evidence snippet**. **Sequencing rests** on a **status the producing stage sets**, never on words found in its prose.
-- **Memory scope is decided at design time**: **in-conversation** state dies at the session boundary, **external storage** survives across sessions and users at the price of retrieval latency, **summarisation** keeps only what the summariser chose, **stateless** keeps nothing by design. **Resumability needs state outliving the process**. A longer timeout only makes interruption rarer.
-- **Frameworks wrap the same loop** and **charge in visibility**, obscuring the prompts and responses underneath. Start against the model API directly, understand what a framework does below its abstraction, and **reduce layers moving into production**.
-- The **pattern choice belongs to a path**, **not to a system.** Run the **enumeration test on each route separately**: a **settled route takes code**, and a **model-driven step belongs** only where the **route forks unpredictably**. One decision made for the whole product **produces both named errors at once**, paying for planning on the settled majority and having no branch for the exception.
+- The **enumeration test**: could you list the steps before the input arrives? If so, code holds the plan and the model works inside each step. If not, the model holds the plan and code holds the limits: turn caps, spend caps, validation.
+- A workflow sends models and tools down paths fixed in code. An agent steers itself. Model and tools can match while the owner of the next decision differs.
+- Five workflow shapes, chosen by what the run does not know: chaining for a fixed ordered split, routing for known categories, parallelisation for independent parts or repeated tries, orchestrator-workers when the subtasks depend on the input, evaluator-optimizer when criteria are written and another round helps.
+- Adaptivity pays only when a later step exists because of what an earlier one found, so an unfamiliar system is the standard case. Variable input alone is a routing problem.
+- An agent loop will not stop by itself. Build exits in: a maximum turn count and a spend ceiling returning distinct error states, never the model deciding it is done.
+- A coordinator owns the budget, the checking and the handoff contract: a spend limit per worker, each result checked against a defined shape before moving on, and an agreed meaning of a finished subtask. Tracing and retries block nothing downstream. Peer negotiation deletes the component whose job it was.
+- A delegated subtask needs an objective, an output format, named tools and sources, and a boundary. Short instructions give workers who misread the job or duplicate each other.
+- A multi-agent system costs about fifteen times a chat and an agent about four, since every worker spends its own tokens on its own context. Only real parallel exploration earns that back: separate sources, material beyond one window, many tools. Tightly coupled work pays for fan-out and gains nothing.
+- Fan-out adds places to fail, so retry, backoff and fallback belong on each worker. One stuck worker can keep the synthesis step waiting forever.
+- A subagent starts without the parent conversation. The launching prompt is the only way in, and only its final message comes back. Skills do not carry over to a delegated task. Permission scope does.
+- No later stage can recover a fact nobody recorded, so whoever sees a detail writes it down: path, symbol, line range, evidence snippet. Ordering depends on a status the producing stage sets, not on wording in its prose.
+- Memory scope is set at design time. Conversation state dies at the session edge. External storage lasts across sessions and users but adds lookup delay. Summaries keep only what the summariser chose. Stateless keeps nothing. Resumability needs state that outlives the process. A longer timeout only makes interruption rarer.
+- Frameworks wrap the same loop and cost visibility, hiding the prompts and responses below. Start with the model API, learn what a framework does underneath, and cut layers on the way to production.
+- Pattern choice belongs to a path, not a system. Run the enumeration test on each route alone. A settled route takes code. A model step belongs only where the route forks unpredictably. One choice for the whole product causes both named mistakes: paying for planning on the settled majority, and having no branch for the exception.
 
-**ELI5.** Use a recipe card when you know the steps. Use a tasting chef only when the next step depends on what the last one found. If the chef hires helpers, check every plate, give each helper a clear ticket, and watch the food bill. Write down what must survive the shift, and decide each route on its own.
+**ELI5.** If you know the steps, write a recipe. If not, let a chef taste and decide, with a timer and a budget. Check what each helper hands back.
 
 ## Endnotes for this chapter
 

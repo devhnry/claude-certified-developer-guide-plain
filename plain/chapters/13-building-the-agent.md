@@ -1,46 +1,26 @@
 # Chapter 13: The Loop, the Harness, and What You Stop Owning
 
-**Summary**: *Three paths lead to the same loop, and choosing between them is an accounting exercise rather than a taste test. If you adopt a framework, the iteration, the dispatch and the history leave your codebase. In their place come a subprocess model, a configuration format and somebody else's data-handling policy. Get the accounting wrong and you rebuild half of what you adopted. Or regulated data ships through a runtime that nothing covered it for. This chapter reads both columns of that ledger. Then it puts hooks where the rules have to hold.*
+**Summary**: *There are three ways to get the same loop, and picking one is bookkeeping, not taste. Adopt a framework and the iteration, the dispatch and the history leave your code. A subprocess model, a configuration format and someone else's data policy move in. Add it up wrong and you rebuild half of what you adopted, or regulated data runs through a runtime that was never covered for it. This chapter reads both sides of that ledger, then puts hooks where the rules must hold.*
 
 ## Adopting the SDK Deletes Code and Installs Assumptions
 
-**First, the idea.** When you build an agent, you can write the loop yourself or let a library run it. Either way, something moves. Some work leaves your code and some assumptions arrive. This section shows both.
+Think of a restaurant. You can cook in your own kitchen, join a franchise, or rent a kitchen run by someone else. Each way removes work and adds rules. The loop is the cooking.
 
-**The analogy: a restaurant kitchen.** You own a restaurant. The **agent loop** (the kitchen's order cycle) takes an order, cooks, serves, and goes back for the next order. You are the **calling application** (the restaurant owner). The model is the chef. Every time I use a kitchen word, the real term is in bold beside it.
+The loop is about sixty lines. Send the messages, read the reply, run the requested tools, add the results, send again. It is the first thing you write for a tool-using model, and it works by the second afternoon.
 
-**The loop is small.** It is about **sixty lines**. Send the messages, read what comes back, run whatever tools were requested, append the results, send again. Nobody **finds it difficult**. It is the **first thing you write** against a **tool-using model** (a model that can ask to call tools), and it works on the second afternoon. This is you running your own kitchen.
+Then a teammate says "use the Agent SDK" (the franchise). Those sixty lines leave your repository. So does the dispatch table, which maps a tool name to a function. So does the list holding the conversation history. Three things you no longer maintain.
 
-**Then the SDK arrives.** A teammate suggests the **Agent SDK** (a library, like hiring a ready-made kitchen crew), and those sixty lines **leave the repository**. So does the **dispatch table** (the list that maps a tool name to a function, like the board that says which station cooks which dish). So does the list that had been **accumulating conversation history** (the order book). That is **three things** nobody on your team maintains any more.
+They did not vanish. The SDK runs the same loop, in the same process, against the same model.<sup>[1]</sup> What changed is who fixes it when it breaks. It is no longer you. In return, your app carries new assumptions. A session maps to a running process. Transcripts land on a local filesystem. Tools are declared, not dispatched.
 
-**What did not change.** None of the three **stopped existing**. The SDK runs the **same loop**, inside the **same process**, against the same model.<sup>[1]</sup> What moved is who **fixes** it when it **breaks**. It is **no longer** you.
+Call this the **ownership ledger**. Every build choice here has two columns. Left: what leaves (iteration, sandbox, retries, runtime). Right: what arrives (an inherited execution model, a configuration format, a data policy, someone else's release schedule). Read only the left and you have not made a choice. Both are always full.
 
-**What moved the other way.** A set of **assumptions your application now carries**:
-- A session maps onto a running process.
-- Transcripts land on a local filesystem.
-- Tools are declared rather than dispatched.
-
-**The ownership ledger.** Call this the **ownership ledger**. Every **construction decision** in this chapter has **two columns**. A choice you make by reading only the **left** one is **not a choice**.
-- The **left column** is what **leaves**: the iteration, the sandbox, the retries, the runtime.
-- The **right column** is what **arrives instead**: an inherited execution model, a configuration format, a data-handling policy, and somebody else's release cadence.
-
-Both columns are **always full**. Nothing is ever **simply gone**.
-
-**ELI5.** Say you hire a kitchen crew so you stop cooking. The cooking still happens. It just happens by their rules, in their way. You gave up some work and took on some of their habits. Always look at both.
+**ELI5.** A franchise buys the stove for you, but you follow its menu. Count what you give up and what you take on.
 
 ## The Loop Is Five Steps and Ends Only When a Response Carries No Tool Calls
 
-**First, the idea.** The loop is a repeating cycle. It stops only when the model's reply asks for no tools. If you know it well, you can spot it whoever built it.
+Picture a cook at the pass. Each order slip means fetching ingredients, then reading the next slip. The cook stops when a slip asks for nothing. You will meet this loop in every implementation.
 
-**Why learn it.** Learn the loop at the **level of code** and you can **recognise** it whoever implemented it. This matters because every decision in this chapter is a decision about which parts of it **somebody else implemented**.
-
-**What happens in one cycle (the order cycle).**
-- The model **receives the prompt** (the order) along with the system prompt, the tool definitions and whatever history exists.
-- It replies with text, with one or more **requests to call a tool**, or with both.
-- The **requested tools run** and their **results go back** in.
-- The cycle repeats.
-- It finishes when a reply arrives carrying **no tool calls** at all.<sup>[2]</sup>
-
-One complete cycle is a **turn** (one trip from order to served dish). A turn runs to completion without **handing control back** to the calling application.<sup>[2]</sup>
+In code terms, the model gets the prompt, system prompt, tool definitions and any history. It answers with text, tool requests, or both. The tools run and the results go back in. This repeats until a reply has no tool calls.<sup>[2]</sup> One full cycle is a **turn**. A turn finishes without handing control back to the calling application.<sup>[2]</sup>
 
 ```
 repeat:
@@ -52,211 +32,135 @@ repeat:
     check   the turn count and the spend against their ceilings
 ```
 
-**Four things get wired.** They are needed no matter who runs that repetition. The **fourth** is the one you skip when the **first three work**.
-- Tools have to be **registered**, each with the **schema naming its arguments** (a description of what inputs it takes).
-- The system prompt has to be **scoped to the task** and to the tools that exist for it, because a broad system prompt produces **broader and less reliable routing**.
-- Every tool call the model issues has to be **executed and answered**. All the calls from one reply must be **resolved together** before the next reply is requested.
-- **Exit conditions** have to be defined, because a loop with **no stopping criterion** keeps asking for tools past the point where the work is done.
+Wire four things, whoever runs the loop. Teams skip the fourth.
 
-**How a run ends.** What the application branches on at the end is the **result's subtype**. The run either:
-- **succeeded**,
-- hit the **turn ceiling**,
-- hit the **spend ceiling**, or
-- was **interrupted by an error**.
+1. Register the tools, each with a schema naming its arguments.
+2. Scope the system prompt to the task and its tools. Broad prompts route worse.
+3. Run and answer every tool call. Answer all calls from one reply together before the next reply.
+4. Set exit conditions. With no stopping rule, the loop keeps asking for tools after the work is done.
 
-The **final text** is present only on the successful one.<sup>[2]</sup> Code that reads the text without **checking the subtype** works perfectly until the first day a limit bites. **Cost and usage** arrive on **every subtype**, including the failures. So a run that ended badly is **still billable** and still has to be accounted for.<sup>[2]</sup>
+At the end, your app branches on the result's subtype. The run succeeded, hit the turn ceiling, hit the spend ceiling, or errored. Only success has final text.<sup>[2]</sup> Code that reads the text unchecked works until the first day a limit hits. Cost and usage come back on every subtype, failures too, so a failed run still costs money.<sup>[2]</sup>
 
-**ELI5.** The kitchen keeps cooking dishes while the chef keeps asking for more ingredients. It stops when the chef says "done" without asking for anything. You also set a limit on time and money, because a chef who never says "done" would cook forever. At the end, always check how the night ended before you trust the final dish.
+**ELI5.** A helper keeps asking for tools until it needs none. You still say when to quit. Then you check whether it finished or got cut off.
 
 ## One Session Is One Subprocess Holding a Shell, a Directory and a Transcript
 
-**First, the idea.** The SDK is not a thin wrapper around a web request. Each session starts a whole separate program. That one fact drives most hosting decisions later in the chapter.
+The SDK is not a thin wrapper over one web request. Starting a query launches a separate command-line process. The SDK talks to it over standard input and output. It owns a shell, a working directory and session transcripts on local disk.<sup>[3]</sup> So concurrency is capped by how many such processes fit in memory. Each keeps its own filesystem state.<sup>[3]</sup>
 
-**The surprise.** The SDK is not a **wrapper around an HTTP call**, and treating it as one is where production surprises come from. Starting a query **spawns a separate command-line process** (a separate program) that the SDK talks to over standard input and output. Think of it as the kitchen being its own room. That process owns:
-- a **shell** (the stove, where commands run),
-- a **working directory** (the counter, where files sit), and
-- **session transcripts** written to **local disk** (the order book).<sup>[3]</sup>
+The subprocess came with the loop, and it settles every hosting question below. It is the right column made real, like the franchise's fixed kitchen layout.
 
-So concurrency is bounded by how many of those processes a host's memory holds. Each one keeps its **own filesystem state**.<sup>[3]</sup>
+Three more things come with it.
 
-Nobody asked for a **subprocess**. It arrived with the loop, and it **decides every hosting question** later in this chapter. That is the ledger's **right column** made concrete.
+**Tools become declarations.** A custom tool has four parts: a name, a description the model reads when deciding to call it, a schema for the arguments, and the function that runs.<sup>[4]</sup> If the function raises an error, the SDK catches it and gives the model an error result. A crash becomes a message the model reacts to, not a page to a human.<sup>[4]</sup>
 
-**Three more things arrive alongside it.**
+**Availability and permission are separate levers.** A tool left off the list stays out of context, so the model never tries it. A scoped rule blocking matching calls leaves the tool visible. The model may spend a turn on something that was never going to run.<sup>[4]</sup> Chapter 14 covers permission modes.
 
-**1. Tool definition becomes declarative.** A custom tool is **four parts**: a name, a description the model reads when deciding whether to call it, a schema for its arguments, and the function that runs.<sup>[4]</sup> **Registration replaces dispatch**. A function that **raises** (throws an error) does not **bring the loop down** either. The SDK **catches** it and hands the model an **error result**. So an unhandled exception becomes a message the model reacts to, rather than a page for a human.<sup>[4]</sup>
+**Continuity is an identifier.** Continuing picks up the most recent session in the working directory. Resuming takes a specific session identifier. Forking copies the history into a new identifier and diverges, leaving the original untouched.<sup>[5]</sup> All three keep the conversation. None keeps the filesystem. So a forked run that edits a file has edited it for every other run in that directory.<sup>[5]</sup>
 
-**2. Availability and permission become separate levers.**
-- Leaving a tool out of the list keeps it **out of context**, so **no attempt** is ever made.
-- A **scoped rule** blocking matching calls leaves the **tool visible**. So a turn can be spent trying something that was never going to run.<sup>[4]</sup>
+Cost tracking shifts too. Each query reports its own total. No session figure exists, so you add up the calls yourself.<sup>[6]</sup> With subagents, the per-call usage figure covers the main loop only. Whole-tree numbers come from the per-model breakdown.<sup>[6]</sup>
 
-Chapter 14 owns the permission modes themselves.
-
-**3. Continuity becomes an identifier.**
-- **Continuing** picks up the **most recent session** in the working directory.
-- **Resuming** takes a **specific session identifier** and returns to it.
-- **Forking** copies the history into a new identifier and diverges, leaving the original thread intact.<sup>[5]</sup>
-
-All three **persist the conversation** and none of them **persists the filesystem**. So a forked run that edits a file has edited it for every other run in that directory.<sup>[5]</sup>
-
-**Accounting shifts too, and quietly.** Each query reports its own total and **no session-level figure exists**. So an application making several calls in one conversation **adds them up** itself.<sup>[6]</sup> Once **subagents** (helpers that run their own conversations) are involved, the per-call usage figure covers the **main loop alone**. Whole-tree numbers come from the **per-model breakdown** instead.<sup>[6]</sup>
-
-**ELI5.** When you hire the crew, they do not just hand you a recipe. They bring a whole kitchen room with its own stove, counter and order book. That room has to live somewhere, and it keeps its own papers. Also, each order gets its own bill, so you add up the bills yourself.
+**ELI5.** Each helper gets its own workshop and desk. Copying a chat does not copy the desk, so two helpers can mess up one desk.
 
 ## A Custom Loop Is Justified by a Constraint the Library Cannot Meet, Never by Preference
 
-**First, the idea.** You can write your own loop directly against the **Messages API**. It is allowed. But you need a real reason, because you then do all the work the library would have done.
+Writing the loop yourself against the Messages API is cooking in your own kitchen. You get full control and full responsibility. Context management, parallel tool handling, retries and exit conditions become code your team writes and keeps alive. Build your own harness only when a constraint rules the library out, the deployment cannot fit what a library assumes, or you need to understand the loop before putting an abstraction on it.
 
-**What it costs.** Writing the iteration directly against the **Messages API** buys **complete control** and charges **complete responsibility**. Here is what you take on:
-- context management,
-- parallel tool handling,
-- retry behaviour,
-- exit conditions.
+The costly mistake is picking a path, then rebuilding the parts that made you pick it.
 
-Every behaviour a library would have supplied for nothing becomes **code humans write**, test and keep working. Your **own harness** (your own kitchen setup) earns its cost in three cases:
-- a **constraint rules the library out**,
-- the **deployment cannot accommodate** what a library assumes, or
-- you need the loop understood before any abstraction sits on it.
+The commonest form is **the framework kept as a type definition**. A team adopts the SDK, then hand-writes the iteration and the history layer anyway. The library only supplies a shape for declaring tools. Now two records of the conversation exist, and no reviewer can say which one the model saw.
 
-**The expensive mistake.** It is rarely picking the **wrong path**. It is picking one and then **rebuilding the parts** of it that were your reason for picking it. Three forms:
+**Structured calls abandoned for prose.** Asking the model to state its plan in text, then parsing it, is not lighter tool use. It throws away the schema, the part that made the request machine-readable. 
 
-- **The framework kept as a type definition.** This is the commonest form. A team commits to the SDK and then **hand-writes the iteration** and the history layer anyway. The library ends up supplying little more than a shape for declaring a tool. **Two sources of truth** now exist for what has happened in the conversation. **No reviewer** can say which one the model **actually saw**.
-- **Structured calls abandoned for prose.** Asking the model to state its intention in text and then **parsing that text** is not a lighter version of tool use. It **discards the schema**, which is the one part of the arrangement that made a request **machine-readable**. It leaves the application **inferring an argument list** from a sentence.
-- **A persistence layer nobody requested.** Moving conversation history into a separate store, when no requirement mentioned durability, **splits ownership** of the state. Reconciling the two copies is now a **feature with a maintainer**.
+**A persistence layer nobody requested.** Say history moves to a separate store though nobody asked for durability. Two places own the state, and syncing them needs a maintainer.
 
-Each of those **reads as diligence**. Each is **more code** than either honest option. Having chosen a path, the **consistent setup** hands it the loop, the dispatch and the history together.
+Each looks like care but adds more code than either honest option. Pick a path, then hand it loop, dispatch and history together.
 
-**ELI5.** You can run your own kitchen if you have a good reason. But if you hire the crew and then cook everything yourself anyway, you pay twice and nobody knows whose order book is right. Pick one way and let it do its whole job.
+**ELI5.** If you joined the franchise, let them cook. Cooking your own version gives two cooks and two recipes. Nobody knows which one the customer got.
 
 ## Where Data May Be Processed Rules Out Deployment Models Before Preference Is Weighed
 
-**First, the idea.** The third path is **Managed Agents**, where Anthropic runs the loop for you. Whether you may use it can be settled by a data rule alone, before you compare anything else.
+**Managed Agents** is the third path, the rented kitchen. Anthropic runs the iteration and the execution sandbox. You define the agent once as a versioned resource, referenced by identifier. Your app sends events in and streams results back.<sup>[7]</sup> Four pieces make it up. The agent is the model, system prompt, tools, connected servers and skills. The environment is where sessions run. The session is one running instance doing one task. The events cross in both directions.<sup>[7]</sup>
 
-**What Managed Agents is.** It is the third construction path, and it **inverts the arrangement**. Think of it as a ghost kitchen (a kitchen you do not own) run by someone else. Anthropic **runs the iteration** and the **execution sandbox** (the sealed space where tools run). The agent is defined once as a **versioned resource** and referenced by identifier. Your application **sends events** in and **streams results back**.<sup>[7]</sup>
+These sessions are stateful by design. History, sandbox state and outputs sit on Anthropic's side. That storage is why Zero Data Retention does not currently cover them, and neither does a HIPAA business associate agreement.<sup>[7]</sup> Protected health information, or a zero-retention commitment, rules this path out. That is a fact, not a judgement call.
 
-**Four pieces** make it up:
-- the **agent**: the model, system prompt, tools, connected servers and skills;
-- the **environment**: where sessions execute;
-- the **session**: one running instance doing one task;
-- the **events**: the messages crossing in both directions.<sup>[7]</sup>
+**Self-hosted sandboxes** sit in between. Orchestration stays with Anthropic. Tool execution moves to infrastructure you control. So the filesystem the agent reads, the processes it starts and the network it reaches fall under your policy.<sup>[8]</sup> The model still sees every tool input and every tool result, because it cannot pick its next step without them.<sup>[8]</sup> Cooking in your own kitchen does not hide the order slips from the restaurant.
 
-**The fact that decides scenarios.** Those sessions are **stateful by design**. They hold conversation history, sandbox state and outputs on **Anthropic's side**. That storage is why **Zero Data Retention** does not currently cover them, and neither does a **HIPAA business associate agreement**.<sup>[7]</sup> So **protected health information**, or a zero-retention commitment, **removes this path**. It is a **fact** rather than a **judgement**. Nothing about how well it fits operationally reopens it.
-
-**Self-hosted sandboxes (your kitchen, their management).** They sit between the two. **Orchestration stays** on **Anthropic's side**. **Tool execution moves** onto **infrastructure you control**. So the filesystem the agent reads, the processes it starts and the network it can reach all fall under **local policy**.<sup>[8]</sup>
-
-**The part that gets misread.** The **model still sees** every tool input and **every tool result**, because it cannot choose a next step without them.<sup>[8]</sup> Moving execution inside a **boundary** reads like moving the conversation inside it. *It does not.*
-
-| The question the scenario is really asking | Managed, cloud sandbox | Managed, self-hosted sandbox | SDK, self-hosted |
+| Question | Managed, cloud sandbox | Managed, self-hosted sandbox | SDK, self-hosted |
 |---|---|---|---|
-| Who runs the iteration | Anthropic | Anthropic | The calling application |
-| Where tool code executes | An Anthropic sandbox | A host under local control | A host under local control |
-| What limits the agent's network reach | Anthropic's egress controls | Local firewall policy | Local firewall policy |
-| Who hardens the image and the runtime | Anthropic | The operator | The operator |
-| Whose humans are paged when it stops | Anthropic's | The operator's, for the worker | The operator's |
+| Who drives the loop | Anthropic | Anthropic | Your app |
+| Where tools run | Anthropic's sandbox | Your host | Your host |
+| Who limits network reach | Anthropic's egress controls | Your firewall | Your firewall |
+| Who hardens the image and runtime | Anthropic | You | You |
+| Who gets paged | Anthropic | You, for the worker | You |
 
-**Self-hosting is shared responsibility.** It is a **shared responsibility** rather than a handover. What stays with you:
-- **Image quality and runtime hardening** (the image is the template for the sandbox). Anthropic does **not inspect the image**.
-- **Egress restriction** (limits on where traffic can go) stays local. Without it, a compromised tool execution reaches **arbitrary hosts**.
-- The **environment key** that authorises work to be claimed and results posted back belongs in a **secrets manager**.
-- Conversation content and tool output **pass through the worker** and remain in that environment. So **retention, redaction and deletion** are a local obligation under local policy.<sup>[9]</sup>
+Self-hosting shares the duty. It does not hand it over. You own image quality and runtime hardening, and Anthropic does not inspect the image. You own egress restriction, or a compromised tool execution reaches any host. The environment key, which lets the worker claim work and post results, goes in a secrets manager. Conversation content and tool output stay in the worker, so retention, redaction and deletion are yours.<sup>[9]</sup> Four things are beyond the provider's reach. It cannot know your key leaked, verify what you put in the image, isolate one tool execution from another in the sandbox, or enforce retention on data that already reached the worker.<sup>[9]</sup>
 
-**Four things** sit outside the **provider's reach**. It cannot:
-- know your key leaked,
-- verify what you put in the image,
-- isolate one tool execution from another inside the sandbox,
-- enforce retention on data that already reached the worker.<sup>[9]</sup>
+Self-hosting the SDK has a smaller version of this. Local disk does not survive a restart, a scale-down or a move to another node. A session store mirrors transcripts alone. Memory files and other working-directory artifacts need a strategy of your own.<sup>[3]</sup> In a container serving several tenants, filesystem settings and project context files carry one tenant's material into another's session. Switch them off, and give each tenant its own working directory and configuration directory.<sup>[3]</sup>
 
-**Self-hosting the SDK teaches the same lesson in a smaller frame.**
-- **Local disk** does **not survive** a restart, a scale-down or a move to another node.
-- A session store **mirrors transcripts alone**. Memory files and other working-directory artifacts are left to a strategy you have to pick.<sup>[3]</sup>
-- In a container serving several tenants (several customers), **filesystem settings and project context files** carry **one tenant's material** into another tenant's session. The fix is to switch those settings **off** and give every tenant its own **working directory and configuration directory**.<sup>[3]</sup>
+Two named failures cause most wrong answers. **Compliance deferred to a later migration**: pilot on the easy path, move later. Regulated data sits outside policy for the whole pilot. **Exception assumed granted**: draft a policy amendment while rolling out anyway. Same violation, plus paperwork.
 
-**Two named failures** cover most of the wrong answers on this material.
-- **Compliance deferred to a later migration.** This proposes piloting on the convenient path and moving once the team knows the shape of the problem. It **processes regulated data outside policy** for the whole of the pilot.
-- **The exception assumed granted.** This drafts a policy amendment while the deployment proceeds. It is the same violation with paperwork attached.
-
-**ELI5.** Some food rules say "this food may never leave our building". If a ghost kitchen stores your food on its shelves, that rule decides it before you compare anything else. Even if you cook in your own building, the chef still reads every order slip. Moving the stove does not hide the orders.
+**ELI5.** Some rules say food may never leave your building. Then the rented kitchen is out, however handy. And if you cook at home, the restaurant still reads each order slip.
 
 ## A Hook Fires at a Fixed Point Whether or Not the Model Cooperates
 
-**First, the idea.** A hook is code that runs at a set moment in the loop. It does not ask the model. It just runs. That makes it the right tool when a rule must hold.
+Picture a head chef checking every plate before it leaves the pass. A **hook** is that check. It is a callback the runtime calls at a named moment in the loop: before a tool runs, after it returns, when a prompt is submitted, when the agent finishes, when a subagent starts or stops, and before context is compacted.<sup>[2]</sup> Hooks run in your application's process, not the agent's context window, so registering one costs no tokens.<sup>[2]</sup>
 
-**What a hook is.** A hook is a **callback the runtime invokes** at a **named moment** in the **loop**. Think of a checkpoint at the pass, where the kitchen hands dishes to the waiters. The named moments are:
-- before a tool executes,
-- after it returns,
-- when a prompt is submitted,
-- when the agent finishes,
-- when a subagent starts or stops,
-- before context is compacted.<sup>[2]</sup>
+A hook is not a request. A callback firing before a tool runs can refuse it, and the tool does not run. The model gets the refusal as the tool's result and usually tries another route.<sup>[10]</sup> A system prompt line is advice the model weighs against everything else. A hook is code that runs.
 
-Hooks execute in the **application's own process** rather than inside the **agent's context window**, so registering one **costs no tokens**.<sup>[2]</sup>
+Four mechanics decide the rest.
 
-**A hook is not a request.** That is what makes it the answer to a whole class of scenario. A callback **firing before a tool executes** can **refuse** it, and the tool then does **not run**. The model receives the refusal as the tool's result and generally tries another approach.<sup>[10]</sup> An instruction in a system prompt is **guidance** the model **weighs against everything else** it was handed. A hook is a **branch that executes**.
+**Position decides what a hook can do.** Only a check before the action can stop it. A callback after can log, swap the result before the model reads it, or add context, but cannot recall what went out. **Audit offered as prevention** is the classic mistake. The logging is real, but it arrives one step late.
 
-**Four mechanics** decide the rest.
+**The strictest answer wins.** When callbacks and rules disagree, deny beats defer, defer beats ask, and ask beats allow. One denial blocks the call, whatever the others said.<sup>[10]</sup>
 
-**1. Position decides capability.** Only a check sitting in **front of the action** can **stop** it. A callback firing **afterwards** can record what happened, replace the result before the model reads it, or attach context. It **cannot recall** what was already sent. **Audit offered as prevention** is the anti-pattern. It survives a first read because the logging is genuine and the report it produces is real. It arrives **one step late**.
+**Order is not promised.** Matching callbacks run at once and finish in no set order, so none may assume another has run.<sup>[10]</sup>
 
-**2. The most restrictive answer wins.** Where several callbacks and rules apply to one call, the order of strength is:
-- refusal outranks deferral,
-- deferral outranks asking,
-- asking outranks allowing.
+**Patterns match names, not arguments.** A matcher filters on which tool is called. Checks on a path, a command or a value go inside the callback.<sup>[10]</sup> A callback that returns without blocking has the same limit. It suits logging, metrics and notifications, and cannot refuse or alter anything, because the loop has moved on.<sup>[10]</sup>
 
-A **single refusal blocks the call** whatever the others returned.<sup>[10]</sup>
+Managed Agents gets there with a permission policy on each toolset. A tool runs automatically, or the session pauses for a human. The built-in agent toolset allows by default. Connected server toolsets ask by default, so a tool added to a server later does not run unreviewed.<sup>[11]</sup> Custom tools your app executes itself sit outside permission policies entirely. That puts the approval decision back into code someone writes.<sup>[11]</sup> Chapter 21 returns to hooks as a safety tool. For building, one rule is enough. Name the moment, then check whether it falls before or after the thing you must control.
 
-**3. Order is not promised.** Every matching callback runs at once and they finish in **no guaranteed sequence**. So each has to work without assuming another already ran.<sup>[10]</sup>
-
-**4. Patterns match names, not arguments.** A matcher filters on the **tool being called**. So anything about a path, a command or a value is a **check written inside the callback**.<sup>[10]</sup> A callback that returns without blocking, letting the loop carry on, is bound the same way. It suits **logging, metrics and notifications**. It can neither refuse nor alter anything, because the loop has already moved on.<sup>[10]</sup>
-
-**Managed Agents does the same thing differently.** It uses a **permission policy** on each toolset. A policy either lets a tool run automatically or **pauses the session** until a human answers.
-- The built-in agent toolset **allows by default**.
-- Connected server toolsets **ask by default**, so a tool added to a server later does **not execute unreviewed**.<sup>[11]</sup>
-- **Custom tools** the application executes itself sit **outside permission policies** entirely. That puts the approval decision back into **code somebody writes**.<sup>[11]</sup>
-
-Chapter 21 takes hooks up again as a safety mechanism. Construction needs one rule from them: **name the moment**, then check whether it falls **before or after** the thing you were asked to control.
-
-**ELI5.** A hook is a guard at the kitchen door. He checks every dish before it goes out, and he does not ask the chef's opinion. A guard who checks after the dish has left can write it down, but cannot stop it. So the guard must stand in front.
+**ELI5.** A chef who looks at each plate before it leaves can send it back. A chef who only writes it in a book afterwards cannot.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers here describe real engineering. Every one names something a competent team has shipped. Several answer a question **one clause away** from the one asked. **Four assumptions** produce nearly all of them.
+Every wrong answer here is real engineering that a good team has shipped. Some answer a question one clause off. Four assumptions build nearly all of them.
 
-**The four wrong assumptions:**
-- **Preference weighed against a constraint that already decided.** The scenario names a **residency rule**, a **retention commitment** or a **regulator**. An option treats it as **one consideration** to be **balanced against delivery speed**. A requirement of that kind **sets the feasible set** before **anything else is compared**. So the option becomes correct only where the scenario **states no such requirement**.
-- **Half-adoption dressed as caution.** A path is chosen, then one of its **core services** is **rebuilt by hand** or **supplemented with a store** nothing asked for. It reads as prudence and produces **two owners** for **one piece of state**.
-- **Recording mistaken for preventing.** **Logs, traces and post-run review** are offered where the scenario asked that something be **stopped**. A **refusal** has to arrive while the call is **still a request**, because a **returned tool call** has **nothing left to withhold**. Read the **verb in the requirement**, then put your code on the **matching side of the action**.
-- **A boundary inferred from where code runs.** **Execution moved onto local hosts** is assumed to mean **nothing crosses to the provider**. Or a **managed runtime** is assumed to **inherit coverage** the account already holds. Ask what each **component must see** to do its job, and you have the **boundary**.
+- **Preference weighed against a constraint that already decided.** The scenario names a residency rule, a retention commitment or a regulator. The option weighs it against delivery speed. But such a requirement sets the allowed options before anything is compared.
+- **Half-adoption dressed as caution.** You pick a path, then rebuild one of its core services or add a store nobody asked for. It looks prudent but gives one piece of state two owners.
+- **Recording mistaken for preventing.** Logs, traces and post-run review are offered where something must be stopped. A refusal must arrive while the call is still a request, because a returned tool call has nothing left to withhold. Read the requirement's verb, then put your code on the matching side.
+- **A boundary inferred from where code runs.** Someone assumes local execution means nothing crosses to the provider. Or that a managed runtime inherits coverage the account already holds. Ask what each component must see. That is your boundary.
 
-**Match** on what the **scenario** is doing, never on the **industry** it is **dressed** in.
+Match the scenario's behaviour, not its industry.
 
-| When the scenario says | The answer is usually | The trap is usually |
+| Scenario | Usual answer | Usual trap |
 |---|---|---|
-| A residency, retention or regulatory rule applies and a hosted option is offered | Take the deployment the rule permits, then work its operational cost down | Balancing the rule against speed, piloting first, or assuming an exception gets signed |
-| The team has committed to a framework and is now wiring tools | Let it own the loop, the dispatch and the history | Hand-writing any of the three, or bolting on a store nothing asked for |
-| A specific action must never be performed | A check running before the tool executes, able to refuse it | Logging it afterwards, or forbidding it in the system prompt |
-| Execution must stay inside a network boundary, orchestration may sit outside | Move tool execution onto infrastructure under local control | Assuming nothing then crosses to the provider at all |
-| A long-running task should not hold a local process open, and no data rule applies | A managed runtime owning the session and the sandbox | Ruling it out on preference, or choosing it with regulated data in scope |
-| The run has to stop on a stated condition | An explicit ceiling the runtime enforces and reports | Expecting the model to finish when the work looks done |
-| Cost must be attributed across a run that spawned subagents | Whole-tree accounting, across every model that ran | The main loop's usage figure, which stops at the first nesting |
-| A rule must hold for tools nobody has added yet | A default that asks rather than allows | An allow list naming the tools that exist today |
+| A residency, retention or regulatory rule applies, and a hosted option is offered | Use the deployment the rule allows, then cut its running cost | Trading the rule for speed, piloting first, or assuming an exception |
+| Team chose a framework and is wiring tools | Let it own loop, dispatch and history | Hand-writing any of them, or adding an unrequested store |
+| One action must never happen | A check before the tool runs that can refuse | Logging afterwards, or banning it in the system prompt |
+| Execution must stay in a network boundary, orchestration may be outside | Run tools on infrastructure you control | Thinking nothing then reaches the provider |
+| Long task, no local process held open, no data rule | A managed runtime owning session and sandbox | Rejecting it on preference, or using it with regulated data |
+| Run must stop on a stated condition | A ceiling the runtime enforces and reports | Waiting for the model to decide it is done |
+| Cost across a run with subagents | Whole-tree accounting over every model | The main loop's usage figure, which stops at the first nesting |
+| A rule must cover tools not yet added | A default that asks | An allow list of today's tools |
 
-**A habit that works past the table.** One habit beats the table. **Name the constraint** the scenario states before you compare anything. Then ask which **options survive** it. Most wrong answers here are sound engineering that the stated constraint had already **taken off the board**.
+One habit beats the table. Find the stated constraint first. Then see which options survive it.
 
-**ELI5.** Most wrong answers are good ideas used in the wrong place. Before you pick a kitchen, read the house rules first. If a rule already says no, the best-looking kitchen is still the wrong one.
+**ELI5.** Read the rules of the game first. A clever move that breaks a rule is still wrong.
 
 ## What to Remember
 
-- The **ownership ledger**: every path has **two columns**. One is what **leaves the codebase**. The other is what arrives as an **inherited assumption**. A choice made from **one column** is **not a choice**. Adopting the SDK removes **loop, dispatch and history** and installs a **subprocess per session** writing **transcripts to local disk**.
-- The **agent loop**: **prompt, system prompt, tool definitions and history** go in. The model **answers or requests tools**. **Results go back**. The cycle **ends** only when a reply **requests no tools**. One cycle is a **turn**, and it **completes without returning control** to the caller.
-- **Four things get wired** on **every path**: **tools registered with schemas**, a **system prompt scoped** to the task and its tools, **every tool call executed and answered together** before the next reply, and **explicit exit conditions**. The last one matters because the model deciding it is finished stops nothing.
-- **Branch** on the **result's subtype**, never on the text. A run **succeeds**, hits the **turn ceiling**, hits the **spend ceiling**, or **errors**. The **final text** exists **only on success**. **Cost and usage** arrive on **all four**.
-- A **custom loop** is justified by a **constraint the library cannot meet**, never by unfamiliarity. It charges you **context management**, **parallel tool handling**, **retries and exit conditions** as code humans maintain.
-- **Half-adoption is the expensive answer**: **hand-writing the loop or the history** after choosing a framework leaves **two sources of truth** for the conversation. Parsing intent from prose **discards the schema** that made a call machine-readable.
-- **Managed Agents** runs the **loop and the sandbox**, with the agent defined as a **versioned resource** addressed by identifier. Its **sessions are stateful** and **stored server-side**. So **Zero Data Retention does not cover** them, and neither does a **HIPAA business associate agreement**. That rules the path out whatever else fits.
-- A **self-hosted sandbox** moves **tool execution** onto local infrastructure while **orchestration stays with Anthropic**, and the **model still sees** every tool input and result. Self-hosting makes **image hardening, egress, key rotation and retention** the operator's job.
-- A **hook runs** at a **named point** in the loop, inside the **application process** rather than the **context window**, so it **costs no tokens**. The **most restrictive decision wins**. **Matching callbacks** run in parallel in **no fixed order**. **Matchers filter tool names**, not arguments.
-- **Refusal works** only in **front of the action**. A **denial** before a tool executes **stops the call**. Code sitting behind it can **describe, replace or annotate** a result and cannot unmake it. **Audit trails and traces** answer a **reporting requirement**, never a **prohibition**.
+- The ownership ledger: each path has two columns, what leaves the codebase and what arrives as an inherited assumption. One column alone is not a choice. Adopting the SDK removes loop, dispatch and history. It adds a subprocess per session writing transcripts to local disk.
+- The agent loop: prompt, system prompt, tool definitions and history go in. The model answers or requests tools. Results go back. It ends only when a reply requests no tools. One cycle is a turn, and it completes without returning control to the caller.
+- Four things get wired on every path: tools registered with schemas, a system prompt scoped to the task and its tools, every tool call executed and answered together before the next reply, and explicit exit conditions. The model deciding it is finished stops nothing.
+- Branch on the result's subtype, never the text. A run succeeds, hits the turn ceiling, hits the spend ceiling, or errors. Final text exists only on success. Cost and usage arrive on all four.
+- A custom loop needs a constraint the library cannot meet, never unfamiliarity. It costs you context management, parallel tool handling, retries and exit conditions as code humans maintain.
+- Half-adoption is the expensive answer. Hand-writing the loop or the history after choosing a framework leaves two sources of truth. Parsing intent from prose discards the schema that made a call machine-readable.
+- Managed Agents runs the loop and the sandbox, with the agent as a versioned resource addressed by identifier. Its sessions are stateful and stored server-side. So Zero Data Retention does not cover them, nor does a HIPAA business associate agreement. That rules the path out whatever else fits.
+- A self-hosted sandbox moves tool execution onto local infrastructure while orchestration stays with Anthropic. The model still sees every tool input and result. Image hardening, egress, key rotation and retention become the operator's job.
+- A hook runs at a named point in the loop, inside the application process, not the context window, so it costs no tokens. The most restrictive decision wins. Matching callbacks run in parallel in no fixed order. Matchers filter tool names, not arguments.
+- Refusal works only in front of the action. A denial before a tool executes stops the call. Code behind it can describe, replace or annotate a result and cannot unmake it. Audit trails and traces answer a reporting requirement, never a prohibition.
 
-**ELI5.** Every way of running the kitchen gives something up and takes something on, so look at both. The loop keeps going until the chef asks for nothing. If a rule says "never", put a guard at the door before the dish goes out. Do not just write it in a logbook afterwards.
+**ELI5.** Count what you give up and take on. Tell the helper when to stop. Put the checker before the door.
 
 ## Endnotes for this chapter
 

@@ -1,158 +1,125 @@
 # Chapter 1: What This Exam Tests That an Interview Does Not
 
-**Summary**: *An interview asks whether you can build the thing. This exam asks whether you reached for the right mechanism (the right part of the system to act on). Almost every wrong answer it offers is a mechanism that works perfectly well somewhere else. That is the difficulty, and you cannot read past it. This chapter sets the idea up on the smallest material in the syllabus. It covers what a token is, what the window is, why one request run twice returns two different answers, and which dial does which job. That is four facts. A surprising number of later questions fall apart once you hold them straight.*
+**Summary**: *In an interview, you show you can build something. On this exam, you show you can choose the right tool. The wrong answers are real tools that suit some other problem, so you cannot just skim them. This chapter uses the smallest ideas in the syllabus: what a token is, what the window is, why the same request can come back different, and which dial controls what. Hold those four straight and many later questions get easy.*
+
+One picture runs through the chapter. A request is an order handed to a cook. The cook works one scoop at a time, and the counter is only so big.
 
 ## The Same Request Twice Returns Two Different Answers, and Nothing Is Broken
 
-**First, the idea.** Claude does not look up an answer. It picks one piece at a time. So the same request can come back worded differently, and that is normal.
+Order the same dish twice, with the ticket byte for byte identical. The plates come out slightly different. A model does the same. The two responses often use different words. Sometimes the structure differs. Now and then one adds a caveat the other skips.
 
-**The analogy for this chapter: a kitchen.** Your **request** is the order ticket. **Claude** is the chef. The chef builds the dish one scoop at a time. Each scoop is a **token** (a small chunk of text). Every dial in this chapter is a different knob in that kitchen. Keep asking one question: which knob does this option turn?
+Most people open a ticket. They suspect a stray timestamp, a redeployed config, or two code versions behind a load balancer. Usually nothing changed. The model writes one token at a time, and it samples each choice. It does not look the answer up. So two runs can split at any step and stay split. Anthropic states it directly: identical inputs can produce different outputs even with temperature set to 0, on its own inference service and on third-party providers.<sup>[1]</sup> Temperature 0 does not turn the cook into a machine. It narrows the choices. It does not cut them to one.
 
-**What happens.** Send a request. Send it again, **byte for byte identical** (exactly the same). The two responses will often **differ in wording**. Sometimes they differ in structure. Occasionally one has a caveat and the other does not.
+A person hardly notices. A parser does, and so does any step that expected a field and got a sentence.
 
-**The reflex.** The reflex is to **open a ticket**. You assume something **upstream must be varying**. Maybe a stray timestamp is in the prompt. Maybe a config got redeployed. Maybe two versions of the code are running behind a load balancer.
+Here the exam leaves the interview behind. In an interview, "it varies, that is expected" ends the talk. Here, a scenario shows the variation, adds a believable defect, and asks what you tell the teammate. The scored answer names the mechanism, then says what the application does about it. Stopping at "that is expected" fixes nothing.
 
-**What is really going on.** Usually **nothing is varying**. **Generation proceeds one token at a time** (the chef adds one scoop at a time). Every one of those choices is **sampled rather than looked up** (picked from a shortlist, not read from a recipe card). So two runs can differ at any single position and stay different for the rest of the response. Anthropic says the strong form of this plainly. **Identical inputs can produce different outputs** even with **temperature set to 0**. That is true on Anthropic's own inference service and on third-party providers.<sup>[1]</sup> Temperature 0 is not a **determinism switch**. It narrows the shortlist. It does not shrink it to a single choice.
+The application can validate the output, retry on failure, and use sampling settings when consistency matters more than variety. None of that makes the cook repeat a plate. It makes the restaurant cope when the plate changes.
 
-**Why it matters in code.** **Humans absorb the rewording** without noticing it. A **parser** does not. Neither does a **downstream step** that expected a field where a sentence now sits.
+Remember the shape: a fact about the technology, then the part of your system that absorbs it. Only the first half just describes the world. Only the second treats a permanent property as a bug.
 
-**Where the exam differs from an interview.** An interviewer watching you debug would accept "it varies, that is expected" and move on. A scenario here will **describe the variation**, put a **plausible defect** beside it, and ask what you tell the teammate who found it. The **scored answer** does two things. It **names the mechanism**, and then it says what the **application** does about it. A developer who stops at "that is expected" has **explained the behaviour** and **shipped nothing**.
-
-**What the application does.**
-- **Validation** (check the output has the shape you need).
-- A **retry on failure**.
-- **Sampling settings** where **consistency** matters more than **variety**.
-
-None of these make the model repeat itself. They make the **surrounding system tolerant** of the fact that it will not. In kitchen terms, you cannot make the chef plate every dish identically. You add a check at the pass before the plate leaves.
-
-**The shape to remember.** This answer comes up again and again: a **property of the technology**, then the **component that absorbs** it. An option with only the first half is **describing the world**. An option with only the second half treats a **permanent property as a bug** that has a fix.
-
-**ELI5.** A chef making soup never makes it exactly the same twice. That is not a broken kitchen. So when it matters, you taste the soup before it goes out. You do not shout at the chef.
+**ELI5.** Ask a cook for the same soup twice. It tastes close, never identical. You do not scold the cook. You taste each bowl before it leaves the kitchen.
 
 ## A Token Is the Unit You Are Billed In, Limited By, and Debugging Against
 
-**First, the idea.** A **token** is the scoop Claude works in. Three different things in this syllabus are counted in scoops.
+A **token** is the smallest piece the model handles, like one scoop. It can be a word, part of a word, a character or a byte. It is not one word each. For Claude it is roughly 3.5 English characters, and that shifts with the language.<sup>[2]</sup>
 
-**What a token is.** A **token** is the **smallest unit** the model works in. It maps to **words, subwords, characters or bytes**. It is not as tidy as one word each. For Claude, a token is **roughly 3.5 English characters**, and the ratio moves with the language.<sup>[2]</sup>
-
-**Why it matters.** The definition is worth more than it looks. **Three separate things** in this syllabus are **measured in tokens**. People who have not absorbed the unit treat them as **three unrelated topics**.
+Three things in the syllabus are counted in tokens. Miss that and they look like three topics.
 
 | What is counted in tokens | Where it bites |
 |---|---|
-| Everything you send, on every request (the ingredients you hand the chef) | The bill, and how much of the window (the counter) is left |
-| Everything the model generates (the dish that comes out) | The bill again, at a different rate, and the output cap |
-| Everything the model spends reasoning before it answers (the chef thinking before plating) | The bill a third time, on work no human ever reads |
+| What you send, every request | Your bill, and the room left in the window |
+| What the model writes back | The bill at another rate, plus the output cap |
+| What the model spends thinking first | A third charge, for work nobody reads |
 
-**The row that surprises people.** The **third row** is the one people miss. It is why the **effort setting** exists at all.
+The third row surprises people. It is why the effort setting exists.
 
-**ELI5.** Everything in the kitchen is counted in scoops. The scoops you hand over, the scoops that come out, and the scoops the chef spends thinking. You pay for all three.
+**ELI5.** A token is one scoop of flour. The cook charges per scoop, and the kitchen caps the scoops. Even silent thinking uses scoops.
 
 ## The Window Is Capacity, and Temperature Is Selection
 
-**First, the idea.** The **context window** is how much fits on the counter. **Temperature** is how adventurous the chef is when picking the next scoop. These are two different things.
+The **context window** is the counter. It limits what one request can carry. It is finite and acts as working memory, not storage. As it fills, accuracy and recall slip. Anthropic names this **context rot**.<sup>[3]</sup>
 
-**The window (the counter).** The **context window bounds** how much material one request may carry. It is finite. It behaves as **working memory rather than storage**. **Accuracy and recall degrade** as it fills. Anthropic calls this **context rot**.<sup>[3]</sup>
-
-**The confusion to clear up.** This is the most **productive confusion** in the chapter. It appears in **scenarios repeatedly**. It is always offered by a **colleague who sounds confident**.
-
-**Temperature (how adventurous the chef is).** **Temperature** does not **affect capacity**. It **decides which candidate wins** at each step. It has no bearing on how much **text a request can carry**. So imagine a **transcript will not fit** and a colleague proposes **raising the temperature**. They have not proposed a weaker fix. They have proposed acting on a part of the request that has nothing to do with the problem. Turn it up or down and the wording of the failure changes, but the **failure stands**. A more adventurous chef does not make the counter bigger.
+Here is a mix-up that keeps coming back, usually from a confident colleague. A transcript will not fit, and the colleague says to raise the temperature. That points at the wrong part. Temperature is how daring the cook is when choosing. It says nothing about counter size. Turn it up or down and the failure just reads differently.
 
 | Dial | What it changes | What it cannot change |
 |---|---|---|
-| Temperature and sampling settings (how adventurous the chef is) | Which token gets chosen from the candidates | How much input fits, and what the response costs |
-| Context window (the counter) | How much material one request can hold and cross-reference | How varied or repeatable the wording is |
-| `max_tokens` (the size of the plate) | How long the response may run | How much input fits |
-| Effort (how long the chef thinks) | How many tokens are spent reasoning before answering | How much input fits |
+| Temperature and sampling settings | Which token wins among the candidates | Input size, and cost |
+| Context window | How much one request can hold and cross-check | How varied or repeatable the wording is |
+| `max_tokens` | How long the response can run | Input size |
+| Effort | Tokens spent reasoning before the answer | Input size |
 
-**How to read the table.** Read it as **four separate machines** that happen to sit on the same request. The **capacity-versus-selection confusion** is the **named anti-pattern** here. It also runs the other way. If output wording is **inconsistent**, **trimming the input** does not repair it.
+These are four separate machines on one ticket. Mixing up capacity and selection is the named anti-pattern, and it fails in reverse too: trimming input does not fix inconsistent wording.
 
-**A consequence that settles a whole class of question.** Say a scenario needs a **long document held together**. A reference in section nine has to resolve against something in section two. Both sections must be in the **same request**. That is **capacity**. No **sampling setting**, no **latency improvement** and no **output cap** has anything to say about it.
+Say a scenario needs a long document kept whole, so a reference in section nine resolves against section two. Both sections must sit on the counter in the same request. That is capacity. No sampling setting, speed gain or output cap touches it.
 
-**ELI5.** The counter decides how much food you can lay out. The chef's mood decides which scoop comes next. Changing the chef's mood never makes the counter bigger.
+**ELI5.** The counter is how much food the cook can lay out. The cook's mood is how daring the choices are. A bolder mood does not grow the counter.
 
 ## Reasoning Depth Is a Separate Setting From Model Choice
 
-**First, the idea.** There is no single "how good do you want it" dial. There are **three settings**, they are **independent**, and the exam pulls them apart on purpose.
+New developers often assume one dial says "how good do you want it", and that it is the model name. There are really three independent settings, and scenarios pull them apart on purpose.
 
-**The wrong assumption.** Developers arriving at this material tend to assume one **dial** called "how good do you want it", and that the dial is the **model name**.
+The model sets the capability tier: which cook you hire. **Thinking** decides whether the model reasons in view before answering. **Adaptive thinking** lets it judge how much reasoning a request deserves. **Effort** sets how many tokens Claude spends responding, trading thoroughness for token savings on one model. It works on all supported models with no beta header.<sup>[4]</sup> **Fast mode** is another thing entirely. It gives up to 2.5 times higher output tokens per second on supported Opus models, at premium pricing.<sup>[5]</sup> That is a faster stove, not a better cook.
 
-**The three settings, plus one.**
-- The **model** decides the **capability tier** (which chef you hired).
-- **Thinking** decides whether the model **reasons visibly before answering** (the chef plans out loud before cooking). **Adaptive thinking** lets the model judge how much of that a given request needs.
-- **Effort** controls how many tokens Claude spends when responding. It trades **thoroughness against token efficiency** on a single model. It is available on all supported models with no beta header.<sup>[4]</sup>
-- **Fast mode** is different again. It buys up to **2.5 times higher** output **tokens per second** on supported Opus models, at **premium pricing**.<sup>[5]</sup>
-
-**Quality or speed.** Two of these are **quality dials**. One is a **speed dial**. They are **priced differently**. That is the distinction a scenario tests.
+Two are quality dials, one is a speed dial, and they are priced differently.
 
 | Setting | Buys you | Costs you |
 |---|---|---|
-| A larger model (a better chef) | Capability on genuinely harder work | Money per token, and usually latency |
-| Thinking, or adaptive thinking (planning before cooking) | Reasoning before the answer, on work that needs it | Tokens the user never reads |
-| Effort (how much planning happens) | Control over how much of that reasoning happens | Thoroughness, when turned down |
-| Fast mode (a faster stove) | Output tokens per second | Premium pricing, on supported models only |
+| A larger model | Skill on harder work | More money per token, often more delay |
+| Thinking, or adaptive thinking | Reasoning first, where the work needs it | Tokens the user never sees |
+| Effort | A say in how much of that reasoning happens | Thoroughness, if you turn it down |
+| Fast mode | More output tokens per second | Premium pricing, supported models only |
 
-**A practical trap.** There is a **mechanical trap** under this. **Toggling thinking modes invalidates prompt caching**.<sup>[6]</sup> Prompt caching means reusing a part of the prompt you already sent, like prepped ingredients you do not have to buy again. Say a team turns thinking on for only a **subset of requests**, against a **large stable prefix** (the start of the prompt that stays the same) they had been paying to reuse. They have quietly **given up the reuse**. An interview never asks how two features interact like this. This exam does.
+A mechanical trap sits underneath. Toggling thinking modes invalidates prompt caching.<sup>[6]</sup> Say a team pays to reuse a large stable prefix, then turns thinking on for some requests. The reuse is quietly gone.
 
-**ELI5.** Hiring a better chef, asking the chef to plan first, and buying a faster stove are three different choices. They are not one dial. And if you keep changing how the chef plans, the prepped ingredients can no longer be reused.
+**ELI5.** Hire a better cook, give the cook more thinking time, or buy a faster stove. These are separate choices. A faster stove does not make the cook smarter.
 
 ## Three Prompting Modes, Priced in Tokens
 
-**First, the idea.** The cheapest technique in the book is showing Claude examples. People skip it because it feels too simple to be the answer.
+The last foundation is the cheapest technique in the book. People skip it because it seems too plain.
 
-**The three modes.**
-- **Zero-shot** describes the task and **supplies no examples**.
-- **One-shot** supplies a **single worked example**.
-- **Multi-shot** supplies **several**.
+**Zero-shot** gives the task and no examples. **One-shot** gives one worked example. **Multi-shot** gives several. Each step up spends more tokens for closer adherence. A description states a rule and leaves its edges open. An example shows an edge already settled. Say the prose keeps getting capitalisation wrong. One settled case can fix what another paragraph of rules did not. The cost comes back every time, since the examples ride with each request.<sup>[7]</sup> It is a photo of the finished dish clipped to every ticket.
 
-**The trade.** Moving up that list **trades tokens for adherence** (how closely the output follows the shape you want). A description states a rule and leaves its edges to interpretation. A worked example shows one edge already decided. Say prose keeps producing the wrong capitalisation, or the wrong treatment of an awkward input. One decided case settles what another paragraph of instruction has not. In kitchen terms, a photo of the finished dish beats another paragraph describing it. The **cost recurs**, because the **examples ride along** with every request.<sup>[7]</sup>
+Watch for this. A team holds a few labelled examples of the output it wants. The options: put them in the prompt, store them in a database, train a custom model, or warn users off the hard cases. Putting them in the prompt is the shortest route, and nothing has to be built first.
 
-**The scenario shape to recognise.** A team holds a **small set of labelled examples** that show exactly the output they want. The options offered are:
-- **put them in the prompt**
-- **store them in a database**
-- **train a custom model**
-- **warn users away** from the hard cases
+Training a custom model on a few labelled cases looks like rigour. It is the same information sent down a pricier road, with a deployment to maintain.
 
-Those examples are already what the technique runs on. Putting them in the prompt is the **shortest route** from what the team holds to the output it wants. Nothing has to be built before anyone can try it.
-
-**The anti-pattern.** **Reaching past the cheap mechanism** is the **anti-pattern**, and it will be **dressed as rigour**. Training a custom model on a handful of labelled cases is not more serious than showing the model those cases. It is the **same information**, sent through a far more **expensive channel**, with a **deployment** to maintain afterwards.
-
-**ELI5.** If you want the dish to look a certain way, show the chef a photo. Do not build a new kitchen to teach the chef one recipe.
+**ELI5.** Want a dish plated a certain way? Show the cook a photo. Three photos help more. Sending the cook to a new school is a lot of work for the same photos.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers here are **rarely absurd**. They describe **mechanisms that exist**, that work, and that a competent developer uses weekly. What makes one wrong is a **single assumption** underneath it. **Three assumptions** are worth memorising.
+Wrong answers are rarely silly. They name tools that work and get used weekly. One hidden assumption sinks each one. Three are worth memorising.
 
-**The three wrong assumptions:**
-- **A generation setting offered against a capacity problem.** **Temperature, `max_tokens` and sampling** all act on how the **response is produced** (what the chef does). None of them changes how much **input a request can carry** (what fits on the counter). Say a scenario is about **material that does not fit**. Then every option naming a sampling parameter is **wrong on mechanism**, not on **degree**.
-- **Expected behaviour diagnosed as a defect.** **Run-to-run variation in wording**, with the **request unchanged**, is how **generation works**. An option that **confirms a bug**, **tickets** it, or **proposes pinning something** to remove it has **accepted a false premise**. The **corollary** matters too. An option that **explains the mechanism and stops** has not answered a question that asked what to do.
-- **A heavier mechanism preferred to the one the material already fits.** **Training, retrieval infrastructure and separate applications** all turn up as answers to problems that a few **examples in the prompt** would settle. **Cost is the tell**. Ask what the **option needs built** before it can be **tried** at all.
+- A sampling setting offered for a capacity problem. Temperature, `max_tokens` and sampling shape how the response is made. None changes how much input fits. If material does not fit, any option naming a sampling parameter is wrong on mechanism, not on degree.
+- Normal behaviour called a defect. Wording that drifts between runs of an unchanged request is just how generation works. An option that confirms a bug, files a ticket, or pins something to stop it accepts a false premise. The flip side counts too. An option that explains the mechanism and stops has not answered a question about what to do.
+- A heavy tool picked over the one the material already fits. Training, retrieval infrastructure and separate apps show up as answers to problems a few prompt examples would settle. Cost is the clue. Ask what must be built before anyone can try the option.
 
-**The table.** The table below is the **compressed form**. **Match** on what the **scenario** is doing, not on the **industry** it is set in.
+Match on what the scenario is doing, not the industry around it.
 
 | When the scenario says | The answer is usually | The trap is usually |
 |---|---|---|
-| Identical requests return differently worded responses | Name sampling as the mechanism, then say how the application validates, retries or constrains | Confirming a bug in request construction, or blaming the model version |
-| A document is too long to process, or references across it are being lost | Capacity: fit it in one request, or split and carry state deliberately | A sampling parameter, a latency improvement, or a larger output cap |
-| A small set of labelled examples of the desired output already exists | Put them in the prompt as examples | Training a custom model, or storing them somewhere the model never reads |
-| Output quality is uneven on work that needs reasoning | Thinking or effort, chosen against what the tokens buy | A larger model offered as the only quality dial |
-| Response speed is the stated problem, and quality is fine | The speed mechanism, priced accordingly | Anything that changes what the model produces rather than how fast |
-| A stable prefix is being reused across many requests | Preserve the conditions the reuse depends on | Toggling a setting that silently invalidates it |
+| Identical requests return differently worded responses | Name sampling, then say how the app validates, retries or constrains | Blaming request construction, or the model version |
+| A document is too long, or references across it are lost | Capacity: one request, or split and carry state on purpose | A sampling parameter, faster responses, or a bigger output cap |
+| A small set of labelled examples of the wanted output exists | Put them in the prompt | Training a custom model, or storing them where the model never reads |
+| Quality is uneven on work that needs reasoning | Thinking or effort, weighed against what tokens buy | A larger model as the only quality dial |
+| Speed is the stated problem and quality is fine | The speed mechanism, priced accordingly | Anything that changes what the model writes, not how fast |
+| A stable prefix is reused across many requests | Keep the conditions the reuse needs | Toggling a setting that silently breaks it |
 
-**A habit that works past the table.** When two options both **look reasonable**, ask which **mechanism** each one **acts** on. Then check which **mechanism the scenario named**. On this material the wrong option is almost always acting on a **real mechanism** that the **scenario never mentioned**.
+One habit beats the table. When two options look fine, ask which mechanism each acts on, then check which one the scenario named. The wrong option usually acts on a real mechanism the scenario never mentioned.
 
-**ELI5.** A wrong answer is usually a real kitchen tool used for the wrong job. Ask which knob it turns. Then ask whether that is the knob the problem is about.
+**ELI5.** Wrong answers are real kitchen tools on the wrong job. A whisk is great, but it will not enlarge the counter.
 
 ## What to Remember
 
-- A **token is the unit** of **billing**, of the **window**, and of **reasoning spend**. It is worth roughly **3.5 English characters** in Claude. **Input, output and thinking** are all counted in it, at **different rates**.
-- Each **token is chosen by sampling**. So one **request run twice** can **return different text**, and that holds **even at temperature 0**. It is a **property of how generation works**, not a **defect** in how the request was built.
-- **Temperature selects; the window holds**. A **capacity problem never responds** to a **sampling parameter**. **Inconsistent wording** never responds to **trimming the input**.
-- The **context window is working memory, not storage**. It is **finite**, and **recall degrades** as it fills. Anthropic calls this **context rot**. **Anything that must be cross-referenced** has to be in the **same request**.
-- **Model, thinking and effort** are **three independent settings**, not one **quality dial**. **Fast mode** is a **speed setting**. It buys output tokens per second at **premium pricing**, not capability.
-- **Toggling thinking modes invalidates prompt caching**. So a **per-request thinking decision** can **silently cancel the reuse** a large stable prefix was earning.
-- **Zero-shot, one-shot and multi-shot** trade **tokens for adherence**. Say a team already **holds labelled examples** of the output they want. Then **showing the model those examples** is the **cheapest mechanism that fits**. Reaching past it is the **standard wrong answer**.
+- A token is the unit of billing, of the window, and of reasoning spend. In Claude it is about 3.5 English characters. Input, output and thinking all count, at different rates.
+- Sampling picks each token, so one request run twice can differ, even at temperature 0. That is how generation works, not a flaw in the request.
+- Temperature selects. The window holds. Neither fixes the other's problem.
+- The window is working memory, not storage. Recall drops as it fills, which Anthropic calls context rot. Anything cross-referenced goes in the same request.
+- Model, thinking and effort are three independent settings. Fast mode is speed, bought at premium pricing, not capability.
+- Toggling thinking modes invalidates prompt caching.
+- Zero-shot, one-shot and multi-shot trade tokens for adherence. If a team holds labelled examples, showing them to the model is the cheapest fit. Reaching past that is the standard wrong answer.
 
-**ELI5.** Claude is a chef who picks one scoop at a time, so no two plates match exactly. The counter is only so big, and the chef's mood does not change that. Hiring, planning and speed are separate choices. When you want a certain look, show a photo first.
+**ELI5.** The cook varies a little each time. The counter is only so big. Hiring, thinking time and stove speed are separate choices. When unsure, show the cook a photo before building a new kitchen.
 
 ## Endnotes for this chapter
 
