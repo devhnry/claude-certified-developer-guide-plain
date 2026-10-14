@@ -1,166 +1,127 @@
 # Chapter 21: A Rule in a Prompt Is Not Enforcement
 
-**Summary**: *A control counts as a guardrail only if it still works on a run where the model (the worker) has already decided wrongly. That one test sorts this whole skill. It also demotes most of what teams actually write down. Sort each control twice. First, does it need the model to cooperate? Second, does it run before the effect lands? Hooks (the door guards), permission rules (the locked doors), identity scope (the keycard) and OS isolation (the building walls) pass both questions. A rule agreed in a meeting and typed into a prompt (a sign on the wall) passes neither. Nobody finds that out on a quiet day.*
+**Summary**: *Ask one question of any control: does it still work on a run where the model has already made the wrong call? If yes, it is a guardrail. If no, it is advice. Sort each control with two checks. Does it need the model to cooperate? Does it run before the effect lands? Hooks, permission rules, identity scope and OS isolation pass both tests. A rule typed into a prompt passes neither. Nobody finds that out on a quiet day.*
 
 ## The Rule Was Agreed by Everyone and Refused by Nothing
 
-**First, the idea.** Writing a rule down is not the same as enforcing it. Think of an office building. The model is a **worker** inside it. A rule in a prompt is a **notice on the wall**. A real guardrail is a **locked door**, which stops the worker even if the worker ignores the notice.
+Picture a team that wants its agent to write into one output folder and nowhere else. They put that sentence in the standing instruction. They put it in the project's context file too. Everyone reviews it and agrees.
 
-**The story.** A team decides their agent writes into **one output directory** and nowhere else. The sentence goes into the **standing instruction** (the notice on the wall) and into the project's **context file** (a second notice in the hallway). It gets reviewed, agreed and shipped.
+Months later, a file shows up in the wrong place.
 
-Months later a **write lands** somewhere else.
+Nothing crashed. There was no error. The rule was only a sentence, and Claude weighs sentences against other sentences. On that run, a different sentence won.
 
-**What went wrong?** Nothing failed. No **component threw** an error. The rule had been addressed to the only part of the system whose job is to **weigh sentences against other sentences**. On that run, a **different sentence won**. Anthropic states it plainly. **Permission rules are enforced by Claude Code** rather than by the model. Instructions in a prompt or a **context file** shape what Claude tries to do. They do not change what the **runtime allows**.<sup>[1]</sup>
+Here is the fact to remember. Claude Code enforces permission rules. The model does not. A prompt or a context file changes what Claude *tries* to do. It does not change what Claude is *allowed* to do. <sup>[1]</sup>
 
-**The missing piece.** Call it the **point of refusal**. It is the **moment in the sequence** where something other than the model can still **stop the action**. In the building, that is a locked door. A control with no point of refusal is advice. Good advice, often. But advice.
+What was missing is a **point of refusal**. That is a moment where something other than the model can still stop the action. Without one, a control is only advice. Maybe good advice. Still advice.
 
-**ELI5.** Imagine a sign on a door that says "please don't go in". A kind worker obeys it. A worker who got tricked, or who just made a mistake, walks right in. A locked door stops both of them. Only the locked door counts as a guardrail.
+Here is the one analogy for this chapter. A "keep out" sign is a rule in a prompt. A locked door is a permission rule. The sign works on people who read it and agree. The door works on everyone.
 
 ## Two Questions Sort Every Control You Are Offered
 
-**First, the idea.** Every control you are offered can be sorted with two questions. Both start from the same assumption: the worker has already made the wrong call.
+Assume the worst. On this run, the model has already decided wrongly. Maybe someone hid an instruction in a document it read. Maybe it just slipped. Either way, what follows is the same. Anthropic's threat model lists both causes together for that reason.<sup>[4]</sup>
 
-**The assumption.** Begin from the assumption that costs nothing and settles everything. The **model has already decided wrongly** on this run. A **planted instruction** (a trick hidden in content the agent reads) and an **ordinary mistake** change nothing about what follows. Anthropic's threat model names the **two routes** together for that reason.<sup>[4]</sup>
+Before you call something a layer, ask two things. Does it need the model to cooperate? Does it run before the effect lands?
 
-**The two questions.** Ask both of any control before you count it as a layer:
-- Does it **need the model to cooperate**? (Does it rely on the worker choosing to obey?)
-- Does it run **before the effect lands**? (Does it act before the door is already open and the damage done?)
-
-| Control | Needs cooperation | Runs before the effect | What it produces on a steered run |
+| Control | Needs the model's help | Acts before the damage | What you get when the run is steered |
 |---|---|---|---|
-| A rule in the standing instruction or context file (a notice on the wall) | Yes | Not applicable | Intent, with no refusal underneath it |
-| The model asked to confirm its own proposal (the worker checking their own work) | Yes | Yes | A second opinion from the first opinion |
-| A `PreToolUse` hook (a guard at the door) | No | Yes | A refusal, and a reason returned to the model |
-| A permission deny rule (a locked door) | No | Yes | A refusal the settings own |
-| The scope of the identity the agent acts as (the keycard) | No | Yes | An operation that was never reachable |
-| OS-level sandboxing around the process (the building walls) | No | Yes | A limit no rule had to name in advance |
-| A `PostToolUse` hook, or an audit record (the logbook) | No | No | Evidence of what already happened |
+| A rule written in the standing instruction or context file | Yes | Not applicable | A wish, with nothing behind it to say no |
+| The model asked to confirm its own proposal | Yes | Yes | The first opinion asked for a second opinion |
+| A `PreToolUse` hook | No | Yes | A no, and the reason is handed back to the model |
+| A permission deny rule | No | Yes | A no that lives in the settings |
+| What the agent's identity is allowed to touch | No | Yes | A step the agent has no way to take |
+| OS-level sandboxing around the process | No | Yes | A wall nobody had to write a rule for |
+| A `PostToolUse` hook, or an audit record | No | No | A receipt for something already done |
 
-"A steered run" means a run where the model has been pushed into the wrong decision.
+Only the bottom five rows count as layers. The top two are the guarded process guarding itself. That adds a step but no independence.
 
-**Which rows count?** The bottom five rows are **layers**. The top two are the **guarded process doing its own guarding**. That adds a step and no independence, because the worker is checking the worker.
-
-**How to read the table.** Read the **last column** rather than the first. **Two rows reach refusal** by different routes. The bottom row earns its place for a reason unrelated to **prevention**: it leaves a record.
-
-**ELI5.** Ask two things about any safety measure. Does it need the worker to behave? Does it work before something bad happens? A locked door needs no help from the worker and works first. A logbook works only afterwards, so it tells you what happened but cannot stop it.
+Look at the last column first. Two rows can actually refuse, by different routes. The bottom row is useful too, but not for prevention.
 
 ## A Layer Earns the Name by Failing Without Taking Its Neighbours Down
 
-**First, the idea.** **Layering** means several controls that fail separately. It does not mean several controls. Counting them is not the same thing.
+Three locks that open with one key are really one lock. Drawing it three times just makes a review feel finished.
 
-**The problem with counting.** Three controls resting on **one dependency** behave as one control **drawn three times**. The drawing is what makes a review feel finished. Picture three notices on three walls. They all depend on the same worker choosing to read them.
+**Layering** means controls at three places that fail on their own. They sit on what reaches the model, what the model produces, and what a privileged action may do. Screening controls how often a bad thing gets through. A hard limit controls the damage when screening misses. One cannot stand in for the other. Anthropic lists isolation, network restriction, filesystem control and proxy validation. You combine them. You do not pick one.<sup>[4]</sup>
 
-**What does hold?** The arrangement that holds puts a control at **three positions that fail separately**:
-- what **reaches the model** (who gets in the front door)
-- what the **model produces** (what the worker carries out)
-- what a **privileged action is allowed** to do (what the vault door permits)
+The classic mistake is a stack that shares one failure. Say it holds an instruction to refuse, a reminder to self-check, and a closing prompt to summarise. That is three sentences, read by one reader. Chapter 20 covers screening. Take one idea from it. A control that works by probability sets a rate. It never sets a floor.
 
-Screening decides how often something lands. The hard limit on the action decides how bad it gets when screening misses. Neither substitutes for the other. Anthropic's hardening guidance lists **isolation, network restriction, filesystem control and proxy validation** as options to combine rather than choose between.<sup>[4]</sup>
-
-**The anti-pattern: the stack that shares a failure.** The **stack that shares a failure** is built out of sensible parts. An instruction to refuse, a reminder to self-check and a closing prompt to summarise are **three sentences read by one reader**. Chapter 20 sorts screening in detail. Carry one property from it: a probabilistic control (one that works most of the time) **sets a rate** and **never a floor**.
-
-**The independence test.** It is short enough to run while you read a scenario. Name one failure that **removes two** of them at once. If you can, the **count was wrong**.
-
-**ELI5.** Three locks on one door that all open with the same key are really one lock. Real layers are different kinds of protection, so one broken thing cannot open them all. If you can find one thing that breaks two of your protections at once, you have fewer protections than you thought.
+Use the independence test. Try to name one failure that knocks out two of your controls at once. If you can, your count of layers was wrong.
 
 ## What the Identity Permits Bounds Everything a Steered Agent Can Do
 
-**First, the idea.** The strongest limit is what the agent was never given. In the building, this is the **keycard**. The keycard opens only the doors the worker needs. This is **scope** (what the identity the agent acts as is allowed to do).
+Any other control here can be missing, set up wrong, or written for a different path than the one your agent took. Scope is different. If a capability was never given, no route can reach it, even one nobody expected. Anthropic's design rule is simple. Give the agent only the capabilities its task needs.<sup>[4]</sup>
 
-**Why scope is different.** Every other control in this chapter can be missing, misconfigured, or never written for the path your agent actually took. **Scope** is different, because a **capability that was never granted** cannot be reached by a **route nobody predicted**. Anthropic states the design rule: restrict the agent to only the **capabilities its specific task requires**.<sup>[4]</sup> This is **least privilege** (give only what the job needs).
+The payoff is lower severity. Say the agent's identity can write anywhere. One bad decision becomes an incident. Say it can write to one folder. The same decision ends as a denied call and a line in a log.
 
-**What it buys: lower severity.** **Severity** is what this buys. An agent whose **identity can write anywhere** turns one steered decision into an **incident**. The same decision, made by an identity holding **one writable directory**, ends as a **denied call** and a line in a log.
+Four mechanics decide if the scope you wrote is the scope that actually runs.
 
-**Four mechanics.** **Four mechanics decide** whether the scope you wrote is the scope that runs.
-
-| What you write | What it does to the capability | What can widen it |
+| What you write | Effect on the capability | What can make it bigger |
 |---|---|---|
-| A rule in the prompt or the context file (a notice) | Nothing at all | Any sentence weighed against it |
-| A scoped deny rule such as one naming a command pattern (a lock on one door) | Leaves the tool present, blocks matching calls | Nothing below the scope it sits in |
-| A bare tool-name deny rule (the door removed from the map) | Removes the tool from context, so Claude never sees it | Nothing below the scope it sits in |
-| A deny rule in managed settings (the landlord's lock) | Same, organisation-wide | Nothing on the machine, command-line flags included |
+| A rule in the prompt or context file | None | Any competing sentence |
+| A scoped deny rule, for example one naming a command pattern | Tool stays, matching calls are blocked | Nothing at a lower level |
+| A bare tool-name deny rule | Tool is taken out of context, so Claude never sees it | Nothing at a lower level |
+| A deny rule in managed settings | Same result, across the organisation | Nothing on that machine, even command-line flags |
 
-**Two consequences.**
-- **Deny beats allow at every scope.** So a deny rule cannot carry an **allowlist exception**. The **narrow allow** is the rule you write.<sup>[1]</sup>
-- A **grant needs trust** where a restriction does not. A project's allow rules and additional directories apply only after the **workspace trust dialog** is accepted. Its **deny and ask rules** take effect regardless, because they only ever restrict.<sup>[1]</sup>
+Two things follow.
 
-**The anti-pattern: the broad deny with a carve-out.** The **broad deny with a carve-out** is the anti-pattern the first consequence kills. You cannot lock everything and then poke an exception through the lock, because deny wins.
+First, deny beats allow at every scope. So no allow rule can carve an exception out of a deny rule. Write the narrow allow instead.<sup>[1]</sup> A broad deny with a carve-out does not work.
 
-**A quieter rule underneath.** Whatever can **edit the scope holds the scope**. So changing permission configuration is itself a **privileged action**. Your administrator's copy has to win. That makes a **managed rule** that no local setting or flag can override a **security property** rather than an inconvenience.<sup>[1]</sup>
+Second, giving access needs trust. Limiting access does not. A project's allow rules and extra directories apply only after you accept the workspace trust dialog. Its deny and ask rules apply either way, because they only restrict.<sup>[1]</sup>
 
-**Rules versus isolation.** Credentials sit one layer further out and belong to chapter 22. **Command parsing** checks a shell command against permission rules. It asks for approval when it cannot parse cleanly or **matches no allow rule**. Anthropic labels that machinery a **permission gate rather than a sandbox**, because it does not reason about what a **command's target path** would actually do.<sup>[4]</sup> **Rules cover** what you thought to name. **Isolation covers** the rest. Sandboxing (the building walls) is the complementary layer. It restricts the **filesystem and network reach** of shell commands at the **operating-system level**. That holds even where an injection got past the model's own decision-making.<sup>[1]</sup>
+One quieter rule sits underneath. Whoever can edit the scope owns the scope. So changing permission settings is itself a privileged action. Your administrator's copy has to win. That is why a managed rule, which no local setting or flag can override, is a security property and not an annoyance.<sup>[1]</sup>
 
-**ELI5.** Give a worker a keycard that opens only the one room they need. Then even a tricked worker can only reach that room. A rule can only lock the doors you remembered. Thick walls around the whole building stop the rest.
+Credentials sit one layer further out. Chapter 22 covers them. Command parsing checks a shell command against permission rules. It asks for approval when it cannot parse the command cleanly or finds no allow rule. Anthropic calls this a permission gate, not a sandbox. It does not work out what a command would do to its target path.<sup>[4]</sup> Rules cover only what you thought to name. Isolation handles everything else. Sandboxing limits what shell commands can reach on the filesystem and network, at the operating-system level. That holds even when an injection got past the model's own decision.<sup>[1]</sup>
 
 ## A Hook Chooses Where the Refusal Sits in Time
 
-**First, the idea.** A **hook** (a small program that runs at a set point in the agent's loop) is a guard standing at one spot in time. Some spots come before the action, so the guard can still say no. Some come after, so the guard can only write it down.
+Chapter 13 already built the hook and its precedence. For safety, one point is enough. Hook events split the loop into moments that can still refuse and moments that can only report. A `PostToolUse` hook fires after a tool has already run successfully. It cannot undo anything.<sup>[2]</sup><sup>[3]</sup>
 
-**Where hooks fit.** Chapter 13 built the hook and covered its precedence. Safety needs one thing from it. Hook events **divide the loop** into places that can **still refuse** and places that can **only report**. A **`PostToolUse` hook fires** after a tool has **already executed successfully**, so it cannot undo the action.<sup>[2]</sup><sup>[3]</sup>
+That solves a common exam scenario. A policy must be checked on every privileged action. A compliance record must also exist for a human reviewer, whether or not the action was allowed. These are two needs at two moments. You can deny only while the call is pending. You can record the truth only once it has finished. So you need a pair of hooks, not one clever hook. At session start there is no action to check yet. After the session closes, nothing is left to refuse.
 
-**A scenario worth recognising.** A policy has to be applied to **every privileged action**. A **compliance record** also has to exist for a human reviewer, whether or not the action was permitted. Those are **two requirements at two vantage points**.
-- **Denial** is available only while the **call is still pending**.
-- A **truthful record** is possible only once the call has resolved.
+Position buys more than refusal. Sometimes a value must be changed in a fixed way before the model reasons about it. Anthropic documents two places. Use `PreToolUse` for inputs going out to a tool. Use `PostToolUse` for results coming back, where a returned field replaces the result the model reads next.<sup>[3]</sup> Say two services return dates in different formats. Convert them there. Do not ask the model to remember which service uses which.
 
-So you need a **pair of hooks** rather than one clever one. A check at **session start** has no specific action in front of it. A sweep once the **session has closed** arrives **too late** to have refused anything.
+Handing a fixed rule back to the model is the mistake to watch for. It looks careful. Prompt-based hooks do exist. They put a model in the decision seat on purpose. That suits a judgement call. It does not suit an absolute rule.<sup>[2]</sup>
 
-**Position also buys transformation.** Refusal is not the only thing position buys. Sometimes a **deterministic transformation** (a fixed rule, not a judgement) has to happen before the model reasons over a value. Anthropic documents the **two seats** for it. Intercept at **`PreToolUse` for outbound tool inputs**. Intercept at **`PostToolUse` for inbound tool results**, where a returned field **replaces the result** the model goes on to read.<sup>[3]</sup> Suppose tool results arrive in **incompatible formats**. They get **canonicalised** (converted to one standard form) there. The fix is not an instruction to remember which service uses which.
+Two more documented behaviours finish the picture. A `PreToolUse` hook fires before any permission-mode check, in every mode. If it denies, the tool is blocked even in bypass mode. So policy survives a user changing their own settings. The reverse is false. A hook that returns allow does not beat a deny rule. Hooks tighten and never loosen.<sup>[2]</sup>
 
-**The anti-pattern: the deterministic rule handed back to the model.** The **deterministic rule handed back to the model** wears rigour well. Prompt-based hooks exist. They put a model in the decision seat deliberately. That suits a **judgement call** and not an **absolute rule**.<sup>[2]</sup>
+Aim hooks at where the damage can happen. A hook on every action adds delay to calls that could never hurt anyone. People often cure that delay by removing enforcement. They turn hooks off during a rework, run the agent less often, or move the rule into the prompt. Do none of these. Put them on destructive operations and sensitive access.
 
-**Two documented behaviours.**
-- A **`PreToolUse` hook fires** before any **permission-mode check**, in every mode. A deny from it blocks the tool even in **bypass mode**. That is what lets policy survive a user changing their own settings.
-- The reverse does not hold. A **hook returning allow** does not defeat a **deny rule**. So **hooks tighten and never loosen**.<sup>[2]</sup>
+An aimed hook has two limits.
 
-**Scope them where the consequence lives.** Hooks on every action buy you **latency** (waiting time) on the ones that could not hurt anybody. The repairs that look adjacent all **remove enforcement** instead of aiming it. These are **turning hooks off** during a rework, running the agent less often, or **relocating the rule** into the prompt. Keep hooks on **destructive operations and sensitive access**.
+First, a matcher names the tool, not the effect. Claude can rewrite a file by running a shell command. A hook matched to the file-editing tools stays silent then. That is why compliance scanning uses a `Stop` hook, which inspects the working tree once per turn.<sup>[2]</sup><sup>[3]</sup>
 
-**Two limits keep an aimed hook honest.**
-- A **matcher names the tool, not the effect**. Claude can **rewrite a file** by running a **shell command**. A hook matching the **file-editing tools** does not fire when that happens. This is why compliance scanning uses a **`Stop` hook** that inspects the working tree once per turn.<sup>[2]</sup><sup>[3]</sup>
-- The **argument-level filter** keeps a hook from spawning on irrelevant calls. It **fails open** (it runs the hook anyway) when a command cannot be parsed. This is why the documentation directs a **hard allow or deny** to the permission system instead.<sup>[2]</sup>
-
-Scope with the **best-effort filter**. Enforce with the layer that does not **fail open**.
-
-**ELI5.** A guard at the door can stop you before you go in. A guard who only writes your name in a book after you leave cannot. If you need both a stopped door and a written record, you need two guards. And a guard who only watches the front door misses the person who climbs through the window.
+Second, the argument-level filter, which stops a hook starting on irrelevant calls, fails open when a command cannot be parsed. Failing open means the hook runs anyway. So the documentation sends you to the permission system for a hard allow or deny.<sup>[2]</sup> Use the best-effort filter to scope. Use a layer that does not fail open to enforce.
 
 ## How Wrong Answers Are Built on This Material
 
-**First, the idea.** Wrong answers on this topic are not silly. They describe real controls that real teams build. Each one fails the same test: the worker has already made the wrong call.
+Wrong answers here describe controls that really exist. Experienced people build them. Each fails the same test: the model has already decided wrongly.
 
-**The shape of a wrong answer.** Wrong answers here describe **controls that exist**, that experienced humans build, and that appear in **real deployments**. Each **fails one test**, and it is always the same run: the model has already **decided wrongly**.
+- **Instruction mistaken for enforcement.** Think of a system prompt, a context file, a refusal policy, or a rule that names banned directories. Each shapes what gets attempted. None changes what the runtime permits. They are the right pick only if the question is about making an attempt rarer.
+- **A record offered instead of a refusal.** Logging, alerting, later review, reversal. All of them wait for the damage. They fit when evidence is the need. They are the wrong half of an answer that asks for prevention and a record.
+- **The guarded process checking itself.** The model confirms its own plan, runs a second pass, or gets told to double-check. A run that decided wrongly the first time is the one doing the checking.
+- **Enforcement traded away.** Pausing controls while reworking, limiting when the agent may run, replacing a fixed check with advice. Each fixes a real cost complaint by removing the control. Point it at the actions that carry real consequences instead.
 
-- **Instruction mistaken for enforcement.** A **system prompt**, a **context file**, a **refusal policy**, a **rule naming the directories** that are off limits. Each **shapes what gets attempted** and none **changes what the runtime permits**. So all are **absent on the one run** a guardrail exists for. They become correct where the question asks how to make an **attempt rarer**.
-- **Recording offered where refusal was available.** **Logging the action**, **alerting** on it, **reviewing it later**, **reversing it afterwards**. Each needs the effect to have **happened first**. They are correct where **evidence is the requirement**. They are the wrong half of any question naming both **prevention and a record**.
-- **The guarded process asked to guard itself.** **Self-confirmation**, a **second pass by the same model**, an instruction to **double-check before acting**. This adds a step and **no independence**, because a run that **decided wrongly the first time** is the run doing the checking.
-- **Enforcement traded away** while appearing to tune it. **Suspending controls** during a rework, **narrowing the hours** the agent runs, **swapping a deterministic check for guidance**. Each answers a **real complaint about cost** by **removing the control**. None of them points the control at the **actions that carry consequence**.
-
-**The scenario table.**
-
-| When the scenario says | The answer is usually | The trap is usually |
+| If the scenario says | Usual answer | Usual trap |
 |---|---|---|
-| Write access to production, and which controls are genuinely independent | Scoped credentials, a deterministic check before execution, and validation of proposed actions before dispatch | Any option addressed to the model that is being guarded |
-| A rule must hold and a record must exist whether or not the action proceeded | Two events: refuse before the call, record after it | One check doing both, or a check at session start or session end |
-| The entire safety approach is one screening step or one instruction | Independent layers on input, on output, and on the privileged action | Objections about transport security, billing, or instructions being forgotten |
-| Controls fire on every action and the run has become slow | Keep them on destructive operations and sensitive access, drop the rest | Suspending them, restricting when the agent runs, or moving the rule into a prompt |
-| Values must be normalised before the model reasons over them | Convert in the gap after a tool returns and before its result is read | Asking the model to remember each format, or repairing the wording afterwards |
-| A restriction must survive the person it constrains | Managed settings, which no local file or flag overrides | A documented convention, or a rule in files the constrained party can edit |
+| Write access to production, and which controls are truly independent | Scoped credentials, a fixed check before execution, and checking proposed actions before they are sent | Any option aimed at the model that is being guarded |
+| A rule must hold, and a record must exist even if the action was blocked | Two events: refuse before the call, record after it | One check doing both jobs, or a check at session start or end |
+| The whole safety plan is one screening step or one instruction | Independent layers on input, on output, and on the privileged action | Objections about transport security, billing, or instructions being forgotten |
+| Controls run on every action and things got slow | Keep them only for destructive operations and sensitive access | Turning them off, restricting agent hours, or moving the rule to a prompt |
+| Values must be put in one format before the model thinks about them | Convert after the tool returns, before the model reads the result | Telling the model to remember each format, or tidying the wording later |
+| A restriction must hold against the person it limits | Managed settings, which no local file or flag can override | A team convention, or a rule in files that person can edit |
 
-**One habit that transfers.** For any control offered, **describe the run** where the **model has already been steered**. Then say what that control still does on it. An answer that stops at making the **attempt rarer** has told you where the control belongs, which is **above the floor** rather than at it.
-
-**ELI5.** Most wrong answers are real safety measures that only work if the worker behaves. So ask yourself one question every time. If the worker has already gone wrong, what does this measure still do? If the answer is "nothing", it is a notice on the wall and not a lock.
+One habit works beyond the table. For any control, picture the run where the model was already steered. Then say what the control still does. If the answer is only "it makes the attempt rarer," the control sits above the floor, not at it.
 
 ## What to Remember
 
-- A **guardrail holds** on a run where the **model decided wrongly**. **Sort every control** by two questions: does it **need the model's cooperation**, and does it **run before the effect lands**. Controls needing cooperation **set a rate**. Controls running after the effect **produce a record**.
-- The **point of refusal** is the **moment** something other than the model can **stop the action**. **Permission rules are enforced by the runtime**, so a **prompt or context file** changes what is **attempted** and never what is **allowed**.
-- **Layering means three controls that fail separately**: screening what **reaches the model**, screening what it **produces**, and a **hard limit on privileged actions**. Test it by naming one failure that **removes two** of them. If you can, the **count was wrong**.
-- **Least privilege bounds severity**, because a **capability never granted** cannot be reached by a **route nobody predicted**. Write the narrow allow. **Deny beats allow at every scope** and a deny rule carries **no exceptions**.
-- A **bare tool-name deny removes the tool** from context so Claude never sees it. A **scoped deny** leaves the tool and **blocks matching calls**. **Managed settings override every local file and flag**, which is what stops the constrained party **widening their own scope**.
-- **Permission rules cover what somebody named**. **Sandboxing covers the rest**. Command matching is a **permission gate rather than a sandbox** and does not reason about what a command would do. **OS-level isolation limits filesystem and network reach** whatever the model decided.
-- **`PreToolUse` refuses, `PostToolUse` reports**. A hook after the call **fires** only once the **tool has executed** and **cannot undo** it. So a requirement naming both a **policy check** and a **compliance record** needs **two hooks at two events**.
-- **Hooks tighten and never loosen**. A `PreToolUse` deny holds in every **permission mode**, **bypass included**. A **hook returning allow** does not defeat a **deny rule**.
-- **Scope enforcement** to where the **consequence lives**, keeping hooks on **destructive operations and sensitive access**. A **matcher names the tool, not the effect**: a **shell command** rewriting a file misses a hook matched to the **file-editing tools**.
-
-**ELI5.** A sign on the wall only works on workers who read it. A locked door works on everyone. Give each worker a keycard for just their rooms, put a guard at the doors that matter, and keep a logbook for afterwards.
+- A real guardrail still works when the model got it wrong. Two questions sort controls. Does it need the model? Does it run before the effect? Controls that need the model set a rate. Controls that run afterwards give a record.
+- The point of refusal is a moment when something besides the model can say no. The runtime enforces permission rules. A prompt or context file changes what is attempted, never what is allowed.
+- Layering means three independent controls. One guards input, one guards output, one puts a hard limit on privileged actions. If a single failure removes two, you miscounted.
+- Least privilege caps severity. A capability never granted cannot be reached by an unexpected route. Write the narrow allow. Deny beats allow at every scope, with no exceptions.
+- A bare tool-name deny removes the tool from context, so Claude never sees it. A scoped deny keeps the tool and blocks matching calls. Managed settings beat every local file and flag. That stops people widening their own scope.
+- Permission rules cover what somebody named. Sandboxing covers the rest. Command matching is a permission gate, not a sandbox. OS-level isolation limits filesystem and network reach whatever the model decided.
+- `PreToolUse` refuses. `PostToolUse` reports. It fires only after the tool has run and cannot undo it. A policy check plus a compliance record needs two hooks at two events.
+- A hook can only make things stricter. A `PreToolUse` deny holds in every permission mode, bypass included. A hook returning allow does not beat a deny rule.
+- Use hooks on destructive operations and sensitive access. A matcher names the tool, not what happens. A shell command can rewrite a file and slip past a hook matched to the file-editing tools.
 
 ## Endnotes for this chapter
 

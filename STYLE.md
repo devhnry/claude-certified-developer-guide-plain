@@ -18,12 +18,12 @@ The first pass copied the original's sentences and added labels. That is not a r
 5. Say the plain thing. "The model picks the wrong tool" beats "tool selection degrades".
 
 ## Analogy
-- One analogy per chapter, brought in only where it explains something that is hard. Not every paragraph needs it.
+- One analogy per chapter. Bring it in early, then come back to it in every section where it makes the hard part clearer (not every paragraph). It should be a thread through the chapter, not a single mention.
 - When the analogy is used, the real term follows straight away, so the exam word sticks: "a locked door (a deny rule)".
 - The analogy must never change what the real mechanism does. If it would, drop it for that paragraph.
 
 ## ELI5
-- One short ELI5 per major section, 2 to 4 sentences, a child could follow. Not after every sub-part.
+- One short ELI5 per major section (every `##` section except the endnotes), 2 to 4 sentences, a child could follow. The reader asked for these, so they are required, and the tool counts them. Write `**ELI5.**` at the start of each.
 
 ## Language
 - Everyday words: "use", "fix", "so". No "leverage", "utilize", "robust", "seamless", "comprehensive", "ensure", "enhance", "streamline".
@@ -34,5 +34,5 @@ The first pass copied the original's sentences and added labels. That is not a r
 
 ## Hard limits (tools/check_similarity.py enforces these)
 - At most 25% of sentences may closely match an original sentence.
-- The chapter body must be shorter than the original body, so aim for 70 to 85% of its length.
+- The chapter body must be under 90% of the original body's word count. Aim for 75 to 85%. Turn dense table cells into plain wording and cut repetition.
 - Bold marks must be under half the original's count.
